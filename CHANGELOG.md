@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.5.4
+
+- Separate the icon into two distinct layers: the Slurm cluster and lettering above, and a large eye in its own lower band.
+
 ## 0.5.3
 
 - Restyle the Marketplace icon with blue cluster blocks, black SLURM lettering and a small eye detail on a white background.
