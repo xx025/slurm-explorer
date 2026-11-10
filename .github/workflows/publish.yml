@@ -1,0 +1,60 @@
+name: Publish VS Code extension
+
+on:
+  workflow_dispatch:
+    inputs:
+      publish:
+        description: Publish to Visual Studio Marketplace using the trusted policy
+        type: boolean
+        required: true
+        default: false
+  release:
+    types: [published]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: marketplace-publish
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    if: github.event_name == 'release' || github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Verify extension identity and release version
+        env:
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+        run: |
+          node <<'JS'
+          const manifest = require('./package.json');
+          if (manifest.publisher !== 'xx025') {
+            throw new Error('Expected publisher xx025');
+          }
+          if (process.env.RELEASE_TAG && process.env.RELEASE_TAG !== `v${manifest.version}`) {
+            throw new Error('Release tag must match the package version');
+          }
+          JS
+      - run: npm ci
+      - run: npm test
+      - name: Package extension
+        run: npm run package -- --out slurm-job-viewer.vsix
+      - name: Upload installable package
+        uses: actions/upload-artifact@v4
+        with:
+          name: slurm-job-viewer-vsix
+          path: slurm-job-viewer.vsix
+          if-no-files-found: error
+      - name: Publish with trusted identity
+        if: github.event_name == 'release' || inputs.publish
+        run: npx --no-install vsce publish --packagePath slurm-job-viewer.vsix --oidc

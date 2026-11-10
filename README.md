@@ -7,7 +7,7 @@
 ## 安装与连接
 
 1. 在 VS Code 安装 **Remote - SSH**，连接你的 Slurm 登录节点，例如 `node42`。
-2. 在远端窗口执行 **Extensions: Install from VSIX...**，选择 `slurm-job-viewer-0.2.0.vsix`。
+2. 在远端窗口执行 **Extensions: Install from VSIX...**，选择 `slurm-job-viewer-0.2.1.vsix`。
 3. 确认扩展安装在 **SSH 主机**上。如果扩展列表显示 **Install in SSH: ...**，点击该按钮。
 4. 点击左侧服务器图标 **Slurm**。默认展示远端当前系统用户的任务。
 
@@ -97,11 +97,27 @@
 ```bash
 npm ci
 npm test
-npm run package -- --out ../slurm-job-viewer-0.2.0.vsix
+npm run package -- --out ../slurm-job-viewer-0.2.1.vsix
 ```
 
 运行 `npm run compile` 后，在 VS Code 打开源码目录，按 F5 启动扩展开发窗口。使用 Remote-SSH 在登录节点打开源码目录，可以直接调试真实 Slurm 查询。
 
 扩展运行时没有第三方依赖；安装包只包含编译后的代码、图标、清单和文档。
+
+## 市场发布
+
+Marketplace Publisher ID 为 `xx025`，对应扩展 ID 为 `xx025.slurm-job-viewer`。
+
+在发布者的 Trusted Publishing 页面创建 GitHub Actions 策略：
+
+| 字段 | 值 |
+| --- | --- |
+| Policy name | `slurm-job-viewer-release` |
+| Repository owner | `xx025` |
+| Repository | `slurm-job-viewer` |
+| Workflow | `publish.yml` |
+| Environment | 留空 |
+
+工作流位于 `.github/workflows/publish.yml`。手动运行时，`publish=false` 只测试、打包并上传构建附件；`publish=true` 使用 OIDC 发布到市场。正式发布 GitHub Release 时也会触发市场发布，Release 标签必须与 `package.json` 的版本匹配，例如 `v0.2.1`。
 
 English documentation is included as `README.en.md`.

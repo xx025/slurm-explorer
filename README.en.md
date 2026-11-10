@@ -7,7 +7,7 @@ Download the installable package from [GitHub Releases](https://github.com/xx025
 ## Installation
 
 1. Connect to a Slurm login node using **Remote - SSH**.
-2. Run **Extensions: Install from VSIX...** and select `slurm-job-viewer-0.2.0.vsix`.
+2. Run **Extensions: Install from VSIX...** and select `slurm-job-viewer-0.2.1.vsix`.
 3. Ensure the extension is installed on the SSH host.
 4. Open **Slurm** from the activity bar.
 
@@ -80,7 +80,23 @@ Use Node.js 22 or newer:
 ```bash
 npm ci
 npm test
-npm run package -- --out ../slurm-job-viewer-0.2.0.vsix
+npm run package -- --out ../slurm-job-viewer-0.2.1.vsix
 ```
 
 Open the source directory in VS Code and press F5 to launch the extension development host. For a read-only live backend check on a Slurm login node, compile first and run `node test/live-check.cjs`.
+
+## Marketplace publishing
+
+The publisher is `xx025` and the extension ID is `xx025.slurm-job-viewer`.
+
+Create a GitHub Actions Trusted Publishing policy with:
+
+| Field | Value |
+| --- | --- |
+| Policy name | `slurm-job-viewer-release` |
+| Repository owner | `xx025` |
+| Repository | `slurm-job-viewer` |
+| Workflow | `publish.yml` |
+| Environment | Leave empty |
+
+The workflow is `.github/workflows/publish.yml`. Manual runs with `publish=false` only test, package and upload the build artifact. Set `publish=true` to publish with OIDC. Publishing a GitHub Release also triggers Marketplace publishing; its tag must match the package version, such as `v0.2.1`.

@@ -2,8 +2,8 @@
   "name": "slurm-job-viewer",
   "displayName": "Slurm Job Viewer",
   "description": "%extension.description%",
-  "version": "0.2.0",
-  "publisher": "local-tools",
+  "version": "0.2.1",
+  "publisher": "xx025",
   "license": "MIT",
   "engines": {
     "vscode": "^1.90.0"
@@ -231,7 +231,7 @@
   "devDependencies": {
     "@types/node": "^20.17.0",
     "@types/vscode": "1.90.0",
-    "@vscode/vsce": "3.6.2",
+    "@vscode/vsce": "4.1.0",
     "typescript": "^5.7.0"
   },
   "repository": {

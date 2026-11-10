@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.2.1
+
+- Set the Marketplace publisher to xx025.
+- Added a GitHub Actions workflow for trusted publishing with OIDC.
+- Added a build-only workflow mode to validate packages before publishing.
+- Updated the packaging tool to support trusted publishing.
+
 ## 0.2.0
 
 - Added a user scope selector for own, all and specified user jobs.
