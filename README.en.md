@@ -1,4 +1,4 @@
-# Slurm Job Viewer
+# Slurm Explorer
 
 [简体中文](README.md) · [VS Code Marketplace](https://marketplace.visualstudio.com/items?itemName=xx025.slurm-job-viewer)
 
@@ -10,8 +10,8 @@ View active Slurm jobs, accounting history, partitions and node resources in VS 
 
 1. Connect to a Slurm login node using **Remote - SSH**.
 2. Press `Ctrl+Shift+X` and search for `@id:xx025.slurm-job-viewer`.
-3. Install **Slurm Job Viewer** on the **SSH host**. If you see **Install in SSH: ...**, select it.
-4. Open the **Slurm** cluster outline icon in the activity bar. The remote OS user is selected by default.
+3. Install **Slurm Explorer** on the **SSH host**. If you see **Install in SSH: ...**, select it.
+4. Open the **Slurm Explorer** cluster outline icon in the activity bar. The remote OS user is selected by default.
 
 Requires VS Code 1.90 or newer. The remote host must be able to run `squeue`, `scontrol` and `sacct`. The extension uses your existing SSH permissions; no additional HTTP service or token is needed.
 
@@ -19,7 +19,7 @@ Requires VS Code 1.90 or newer. The remote host must be able to run `squeue`, `s
 
 In the Remote-SSH window, open the Extensions view and choose **… → Check for Extension Updates**. Update the copy installed on the SSH host, then run **Developer: Reload Window**.
 
-If the update is not listed yet, download a `.vsix` from [GitHub Releases](https://github.com/xx025/slurm-job-viewer/releases/latest) and run **Extensions: Install from VSIX...** in the remote window. The repository and release assets are publicly accessible.
+If the update is not listed yet, download a `.vsix` from [GitHub Releases](https://github.com/xx025/slurm-explorer/releases/latest) and run **Extensions: Install from VSIX...** in the remote window. The repository and release assets are publicly accessible.
 
 The job view's **↻** button refreshes job data; extension updates are checked separately.
 
@@ -156,11 +156,11 @@ Use Node.js 22 or newer:
 ```bash
 npm ci
 npm test
-npm run package -- --out ../slurm-job-viewer.vsix
+npm run package -- --out ../slurm-explorer.vsix
 ```
 
 Open the source directory in VS Code and press F5 to launch the extension development host. For a read-only live check, compile first and run `node test/live-check.cjs` on a login node. The extension has no third-party runtime dependencies.
 
-The extension ID is `xx025.slurm-job-viewer`. `.github/workflows/publish.yml` uses GitHub Actions Trusted Publishing (OIDC). Manual `publish=false` runs validate and package; `publish=true` publishes to the Marketplace. Publishing a GitHub Release also triggers publication; its tag must match the `package.json` version.
+The project is named **Slurm Explorer**. The extension ID remains `xx025.slurm-job-viewer` to preserve existing installations and updates. `.github/workflows/publish.yml` uses GitHub Actions Trusted Publishing (OIDC). Manual `publish=false` runs validate and package; `publish=true` publishes to the Marketplace. Publishing a GitHub Release also triggers publication; its tag must match the `package.json` version.
 
 `media/icon.png` is the Marketplace / extension-list icon, `media/icon.svg` is its editable source, and `media/slurm.svg` is the activity-bar icon.

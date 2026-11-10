@@ -223,7 +223,7 @@ ${details.source === "sacct" ? escape(t("This job was loaded from accounting. Co
 }
 
 export function activate(context: vscode.ExtensionContext): void {
-  const output = vscode.window.createOutputChannel("Slurm Job Viewer");
+  const output = vscode.window.createOutputChannel("Slurm Explorer");
   const client = new SlurmClient(settings, text => output.appendLine(`[${new Date().toISOString()}] ${text}`));
   const tree = new JobTree(client);
   const view = vscode.window.createTreeView("slurmJobs", { treeDataProvider: tree, showCollapseAll: true });

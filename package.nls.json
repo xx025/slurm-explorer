@@ -1,5 +1,5 @@
 {
-  "extension.description": "View Slurm jobs, scheduling details, accounting history and logs through Remote-SSH.",
+  "extension.description": "Explore Slurm jobs, partitions, nodes, accounting history and logs through Remote-SSH.",
   "command.refresh": "Slurm: Refresh Jobs",
   "command.filter": "Slurm: Filter Jobs",
   "command.history": "Slurm: Show Job History",

@@ -1,5 +1,5 @@
 {
-  "extension.description": "通过 Remote-SSH 查看 Slurm 任务、调度详情、历史记录和日志。",
+  "extension.description": "通过 Remote-SSH 浏览 Slurm 作业、分区、节点、历史记录和日志。",
   "command.refresh": "Slurm: 刷新任务",
   "command.filter": "Slurm: 筛选任务",
   "command.history": "Slurm: 查看历史任务",

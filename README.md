@@ -1,4 +1,4 @@
-# Slurm Job Viewer
+# Slurm Explorer
 
 [English](README.en.md) · [VS Code 扩展市场](https://marketplace.visualstudio.com/items?itemName=xx025.slurm-job-viewer)
 
@@ -10,8 +10,8 @@
 
 1. 使用 **Remote - SSH** 连接 Slurm 登录节点。
 2. 按 `Ctrl+Shift+X` 打开扩展页，搜索 `@id:xx025.slurm-job-viewer`。
-3. 将 **Slurm Job Viewer** 安装到 **SSH 主机**；如果显示 **Install in SSH: ...**，点击该按钮。
-4. 点击活动栏的 **Slurm** 集群线条图标，查看任务。默认使用远端当前系统用户。
+3. 将 **Slurm Explorer** 安装到 **SSH 主机**；如果显示 **Install in SSH: ...**，点击该按钮。
+4. 点击活动栏的 **Slurm Explorer** 集群线条图标，查看任务。默认使用远端当前系统用户。
 
 需要 VS Code 1.90 或更新版本。远端必须能运行 `squeue`、`scontrol` 和 `sacct`。扩展直接使用现有 SSH 登录权限，无需额外的 HTTP 服务或令牌。
 
@@ -19,7 +19,7 @@
 
 在 Remote-SSH 窗口的扩展页点击 **… → Check for Extension Updates（检查扩展更新）**，更新安装在 SSH 主机上的扩展。更新后执行 **Developer: Reload Window（开发人员：重新加载窗口）**。
 
-如果更新尚未显示，也可以从 [GitHub Releases](https://github.com/xx025/slurm-job-viewer/releases/latest) 下载 `.vsix`，在远端窗口执行 **Extensions: Install from VSIX...** 安装。仓库和发布附件均可公开访问。
+如果更新尚未显示，也可以从 [GitHub Releases](https://github.com/xx025/slurm-explorer/releases/latest) 下载 `.vsix`，在远端窗口执行 **Extensions: Install from VSIX...** 安装。仓库和发布附件均可公开访问。
 
 任务视图的 **↻** 只刷新任务数据，不检查扩展版本更新。
 
@@ -156,11 +156,11 @@ Slurm 14091 · stderr
 ```bash
 npm ci
 npm test
-npm run package -- --out ../slurm-job-viewer.vsix
+npm run package -- --out ../slurm-explorer.vsix
 ```
 
 在 VS Code 打开源码目录，按 F5 启动扩展开发窗口。真实集群只读检查可先编译，再在登录节点运行 `node test/live-check.cjs`。扩展运行时没有第三方依赖。
 
-扩展 ID 为 `xx025.slurm-job-viewer`。`.github/workflows/publish.yml` 使用 GitHub Actions Trusted Publishing（OIDC）发布：手动运行 `publish=false` 只检查和打包，`publish=true` 发布到市场；发布 GitHub Release 也会触发，标签必须与 `package.json` 的版本一致。
+项目已更名为 **Slurm Explorer**，扩展 ID 继续使用 `xx025.slurm-job-viewer`，保留现有安装和更新路径。`.github/workflows/publish.yml` 使用 GitHub Actions Trusted Publishing（OIDC）发布：手动运行 `publish=false` 只检查和打包，`publish=true` 发布到市场；发布 GitHub Release 也会触发，标签必须与 `package.json` 的版本一致。
 
 `media/icon.png` 用于扩展市场和扩展列表，`media/icon.svg` 为可编辑源文件；`media/slurm.svg` 用于活动栏。

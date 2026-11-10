@@ -1,6 +1,6 @@
 {
   "name": "slurm-job-viewer",
-  "displayName": "Slurm Job Viewer",
+  "displayName": "Slurm Explorer",
   "description": "%extension.description%",
   "version": "0.6.0",
   "publisher": "xx025",
@@ -120,7 +120,7 @@
       "activitybar": [
         {
           "id": "slurm",
-          "title": "Slurm",
+          "title": "Slurm Explorer",
           "icon": "media/slurm.svg"
         }
       ]
@@ -207,7 +207,7 @@
       ]
     },
     "configuration": {
-      "title": "Slurm Job Viewer",
+      "title": "Slurm Explorer",
       "properties": {
         "slurmJobs.user": {
           "type": "string",
@@ -287,11 +287,11 @@
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/xx025/slurm-job-viewer.git"
+    "url": "https://github.com/xx025/slurm-explorer.git"
   },
-  "homepage": "https://github.com/xx025/slurm-job-viewer#readme",
+  "homepage": "https://github.com/xx025/slurm-explorer#readme",
   "bugs": {
-    "url": "https://github.com/xx025/slurm-job-viewer/issues"
+    "url": "https://github.com/xx025/slurm-explorer/issues"
   },
   "icon": "media/icon.png"
 }

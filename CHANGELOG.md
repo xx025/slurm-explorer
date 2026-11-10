@@ -2,6 +2,8 @@
 
 ## 0.6.0
 
+- Rename the project and extension display name to Slurm Explorer, keeping the extension ID xx025.slurm-job-viewer for existing users.
+
 - Add independent partition and node views with resource summaries, details, manual refresh, visible-view polling and Chinese / English labels.
 - Query cluster resources through scontrol without applying the job user filter.
 

@@ -1,7 +1,7 @@
 {
   "version": "0.2.0",
   "configurations": [{
-    "name": "Run Slurm Job Viewer",
+    "name": "Run Slurm Explorer",
     "type": "extensionHost",
     "request": "launch",
     "args": ["--extensionDevelopmentPath=${workspaceFolder}"],
