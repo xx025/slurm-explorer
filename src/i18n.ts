@@ -1,0 +1,123 @@
+export type Language = "en" | "zh-cn";
+export type Translator = (text: string, ...values: (string | number)[]) => string;
+
+const chinese: Record<string, string> = {
+  "Jobs": "任务",
+  "Running": "运行中",
+  "Pending": "排队中",
+  "Other": "其他",
+  "Show Job Details": "查看任务详情",
+  "Job: {0} ({1})": "任务：{0}（{1}）",
+  "User: {0}": "用户：{0}",
+  "State: {0}": "状态：{0}",
+  "Partition: {0}": "分区：{0}",
+  "Elapsed / limit: {0} / {1}": "已运行 / 时限：{0} / {1}",
+  "CPUs: {0} · Nodes: {1}": "CPU：{0} · 节点数：{1}",
+  "Requested minimum memory: {0}": "请求的最低内存：{0}",
+  "GRES: {0}": "通用资源（GRES）：{0}",
+  "Nodes / pending reason: {0}": "节点 / 排队原因：{0}",
+  "Log preview expired. Reopen the log from the job details.": "日志预览已过期，请从任务详情重新打开。",
+  "File: {0}": "文件：{0}",
+  "Updated: {0}": "更新时间：{0}",
+  "The log may not exist yet or may not be accessible from this host.": "日志可能尚未生成，或当前主机、当前登录用户无权访问。",
+  "State": "状态",
+  "User": "用户",
+  "Partition": "分区",
+  "Pending reason": "排队原因",
+  "Run time": "已运行时长",
+  "Time limit": "时间限制",
+  "CPUs": "CPU 数量",
+  "Nodes": "节点数",
+  "Requested memory / node": "每节点请求内存",
+  "Requested memory / CPU": "每 CPU 请求内存",
+  "Requested memory (c=CPU, n=node)": "请求内存（c=每 CPU，n=每节点）",
+  "Requested resources": "请求资源",
+  "Allocated resources": "已分配资源",
+  "GRES / node": "每节点通用资源",
+  "Node list": "节点列表",
+  "Submit time": "提交时间",
+  "Start time": "开始时间",
+  "End time": "结束时间",
+  "Exit code": "退出码",
+  "Working directory": "工作目录",
+  "Command": "启动命令",
+  "Standard output": "标准输出",
+  "Standard error": "标准错误",
+  "{0} (merged into stdout)": "{0}（合并到标准输出）",
+  "Job {0}": "任务 {0}",
+  "Refresh details": "刷新详情",
+  "Open stdout": "打开标准输出",
+  "Open stderr": "打开标准错误",
+  "Job details": "任务详情",
+  "Resource fields describe the request or allocation. Live GPU utilization and actual memory usage require additional cluster accounting or monitoring.": "资源字段表示请求或分配情况。实时 GPU 利用率和实际内存用量需要集群额外配置记账或监控。",
+  "This job was loaded from accounting. Controller-only fields such as log paths may be unavailable.": "此任务来自记账记录，可能无法获取日志路径等仅控制器保留的字段。",
+  "All fields": "全部字段",
+  "Raw {0} output": "{0} 原始输出",
+  "Querying Slurm…": "正在查询 Slurm…",
+  "All users": "所有用户",
+  "Only me ({0})": "仅自己（{0}）",
+  "Specified user…": "指定用户…",
+  "Choose whose jobs to show": "选择要查看的用户",
+  "The queue and history use this user scope.": "任务列表和历史记录均使用所选用户范围。",
+  "Slurm username": "Slurm 用户名",
+  "Enter one Slurm username, or * for all users.": "输入一个 Slurm 用户名，或输入 * 查看所有用户。",
+  "Enter a username without spaces, commas or control characters.": "请输入不含空格、逗号或控制字符的用户名。",
+  "Choose interface language": "选择界面语言",
+  "Follow VS Code": "跟随 VS Code",
+  "Native command and settings labels follow the VS Code display language.": "原生命令和设置名称跟随 VS Code 显示语言。",
+  "{0} · {1} jobs · {2}": "{0} · {1} 个任务 · {2}",
+  " · filter: {0}": " · 筛选：{0}",
+  "Showing previous results. ": "当前显示上次查询结果。 ",
+  "Find Slurm job": "查找 Slurm 任务",
+  "Job ID, array element (123_4), or heterogeneous component (123+1)": "输入任务 ID、数组任务（123_4）或异构任务组件（123+1）",
+  "Filter Slurm jobs": "筛选 Slurm 任务",
+  "Match job ID, name, state, partition, user or pending reason. Clear to show all.": "匹配任务 ID、名称、状态、分区、用户或排队原因；清空以显示全部。",
+  "Loading Slurm accounting history": "正在加载 Slurm 历史记录",
+  "No jobs found in the configured accounting window.": "在配置的时间范围内未找到任务。",
+  "Start: {0} · End: {1} · Exit: {2}": "开始：{0} · 结束：{1} · 退出码：{2}",
+  "Slurm history · {0} · last {1} days": "Slurm 历史 · {0} · 最近 {1} 天",
+  "Enter a numeric job ID, array element (123_4), or heterogeneous component (123+1).": "请输入数字任务 ID、数组任务（123_4）或异构任务组件（123+1）。",
+  "Unexpected squeue output. The query requires the standard Slurm formatted output.": "squeue 输出格式不符合预期，需要标准 Slurm 格式化输出。",
+  "scontrol did not return a job record.": "scontrol 未返回任务记录。",
+  "Unexpected sacct output.": "sacct 输出格式不符合预期。",
+  "{0} was not found. Install this extension on the Slurm login node through Remote-SSH, or set slurmJobs.binDirectory.": "未找到 {0}。请通过 Remote-SSH 将扩展安装到 Slurm 登录节点，或配置 slurmJobs.binDirectory。",
+  "{0} exceeded the {1}s query timeout.": "{0} 查询超时（{1} 秒）。",
+  "{0} failed: {1}": "{0} 执行失败：{1}",
+  "slurmJobs.binDirectory must be an absolute directory.": "slurmJobs.binDirectory 必须是绝对目录路径。",
+  "Job {0} was not found in the configured accounting window ({1} days).": "在配置的记账时间范围（{1} 天）内未找到任务 {0}。",
+  "{0}\nAccounting fallback: {1}": "{0}\n记账查询回退：{1}",
+  "{0} path is unavailable. Completed jobs may have left the controller; open their known log file directly.": "无法获取 {0} 路径。已完成任务可能已离开控制器，请直接打开已知日志文件。",
+  "Cannot resolve log filename token {0}. Open the resolved log file directly.": "无法解析日志文件名占位符 {0}，请直接打开实际日志文件。",
+  "The log path contains an unresolved filename token.": "日志路径包含无法解析的文件名占位符。",
+  "Cannot resolve a relative log path without an absolute WorkDir.": "缺少绝对工作目录（WorkDir），无法解析相对日志路径。",
+  "Log preview supports regular files only.": "日志预览只支持普通文件。",
+  "[Showing the last {0} KiB]": "[仅显示末尾 {0} KiB]",
+  "Permission denied: {0}. Job visibility and log access use your current login permissions.": "无权访问：{0}。任务可见范围和日志访问取决于当前登录用户的权限。"
+};
+
+export function resolveLanguage(preference: string, editorLanguage: string): Language {
+  return (preference === "auto" ? /^zh\b/i.test(editorLanguage) : /^zh\b/i.test(preference)) ? "zh-cn" : "en";
+}
+
+export function createTranslator(language: Language): Translator {
+  return (text, ...values) => (language === "zh-cn" ? chinese[text] ?? text : text)
+    .replace(/\{(\d+)\}/g, (token, index: string) => values[Number(index)] === undefined ? token : String(values[Number(index)]));
+}
+
+export class UserError extends Error {
+  constructor(readonly template: string, readonly values: (string | number | Error)[] = []) {
+    super(createTranslator("en")(template, ...values.map(value => value instanceof Error ? value.message : value)));
+    this.name = "UserError";
+  }
+}
+
+export function errorMessage(error: unknown, translate: Translator): string {
+  if (error instanceof UserError) {
+    return translate(error.template, ...error.values.map(value => value instanceof Error ? errorMessage(value, translate) : value));
+  }
+  if (error instanceof Error && "code" in error && (error.code === "EACCES" || error.code === "EPERM")) {
+    return translate("Permission denied: {0}. Job visibility and log access use your current login permissions.", error.message);
+  }
+  // Native Slurm diagnostics and job data retain the text returned by the cluster.
+  return error instanceof Error ? error.message : String(error);
+}

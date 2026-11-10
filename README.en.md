@@ -1,0 +1,86 @@
+# Slurm Job Viewer
+
+View Slurm queues, job details, accounting history and log previews in VS Code.
+
+Download the installable package from [GitHub Releases](https://github.com/xx025/slurm-job-viewer/releases/latest).
+
+## Installation
+
+1. Connect to a Slurm login node using **Remote - SSH**.
+2. Run **Extensions: Install from VSIX...** and select `slurm-job-viewer-0.2.0.vsix`.
+3. Ensure the extension is installed on the SSH host.
+4. Open **Slurm** from the activity bar.
+
+The extension runs `squeue`, `scontrol` and `sacct` on the extension host. These commands must be available there. If needed, configure their absolute directory using `slurmJobs.binDirectory`.
+
+## User scope
+
+Click the user icon above the job list, or run **Slurm: Select User Scope**:
+
+- **Only me**: query the remote OS user.
+- **All users**: query jobs visible to your current account.
+- **Specified user**: enter a Slurm username.
+
+The selected scope applies to both the queue and accounting history. Each job row includes its owner. You can also search by owner using the text filter.
+
+Cluster privacy settings and filesystem permissions still apply. The extension uses your existing login permissions.
+
+## Chinese and English
+
+The task list, tooltips, job details, dialogs and log preview labels follow the VS Code display language by default. Chinese editor locales use Simplified Chinese; other locales use English.
+
+Run **Slurm: Change Interface Language** from the command palette or the view's More Actions menu to choose:
+
+- Follow VS Code (`auto`)
+- 简体中文 (`zh-cn`)
+- English (`en`)
+
+Open job details and log previews update when this setting changes. Native command, menu, welcome and settings labels follow the VS Code display language. Slurm field names, state codes, scheduler diagnostics, job data and log contents retain the cluster's original text.
+
+## Features
+
+- Jobs grouped into Running, Pending and Other.
+- Owner, state, partition, elapsed time, CPU count, requested memory and GRES.
+- Detailed resource allocations, pending reason, nodes, working directory, command and timestamps.
+- Job ID lookup, expanded array tasks and heterogeneous components.
+- Accounting history, including exit codes and start/end times.
+- Read-only stdout and stderr previews, bounded to the file tail.
+- Automatic refresh of the visible queue and open logs.
+
+## Settings
+
+Configure these in the remote settings:
+
+```json
+{
+  "slurmJobs.user": "",
+  "slurmJobs.language": "auto",
+  "slurmJobs.binDirectory": "",
+  "slurmJobs.refreshSeconds": 30,
+  "slurmJobs.timeoutSeconds": 20,
+  "slurmJobs.historyDays": 7,
+  "slurmJobs.logTailKB": 256
+}
+```
+
+An empty user uses the remote OS username; `*` selects all users. Set the refresh interval to `0` to disable automatic refresh.
+
+## Limitations
+
+Job details use `scontrol` with a fallback to `sacct` after the controller releases the job. Accounting-only records may lack log paths. Logs must be accessible from the extension host.
+
+Resource fields show requested or allocated resources. Live GPU utilization, VRAM charts and job-step memory peaks are not included.
+
+The extension queries the default cluster and does not load interactive shell initialization scripts. It requires a trusted workspace.
+
+## Development
+
+Use Node.js 22 or newer:
+
+```bash
+npm ci
+npm test
+npm run package -- --out ../slurm-job-viewer-0.2.0.vsix
+```
+
+Open the source directory in VS Code and press F5 to launch the extension development host. For a read-only live backend check on a Slurm login node, compile first and run `node test/live-check.cjs`.

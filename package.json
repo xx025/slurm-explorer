@@ -1,0 +1,245 @@
+{
+  "name": "slurm-job-viewer",
+  "displayName": "Slurm Job Viewer",
+  "description": "%extension.description%",
+  "version": "0.2.0",
+  "publisher": "local-tools",
+  "license": "MIT",
+  "engines": {
+    "vscode": "^1.90.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "keywords": [
+    "slurm",
+    "hpc",
+    "jobs",
+    "remote-ssh"
+  ],
+  "extensionKind": [
+    "workspace"
+  ],
+  "main": "./dist/extension.js",
+  "activationEvents": [
+    "onView:slurmJobs"
+  ],
+  "capabilities": {
+    "untrustedWorkspaces": {
+      "supported": false
+    }
+  },
+  "contributes": {
+    "commands": [
+      {
+        "command": "slurm.refresh",
+        "title": "%command.refresh%",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "slurm.filter",
+        "title": "%command.filter%",
+        "icon": "$(filter)"
+      },
+      {
+        "command": "slurm.history",
+        "title": "%command.history%",
+        "icon": "$(history)"
+      },
+      {
+        "command": "slurm.lookup",
+        "title": "%command.lookup%",
+        "icon": "$(search)"
+      },
+      {
+        "command": "slurm.details",
+        "title": "%command.details%"
+      },
+      {
+        "command": "slurm.stdout",
+        "title": "%command.stdout%",
+        "icon": "$(output)"
+      },
+      {
+        "command": "slurm.stderr",
+        "title": "%command.stderr%",
+        "icon": "$(warning)"
+      },
+      {
+        "command": "slurm.copyId",
+        "title": "%command.copyId%",
+        "icon": "$(copy)"
+      },
+      {
+        "command": "slurm.output",
+        "title": "%command.output%"
+      },
+      {
+        "command": "slurm.selectUser",
+        "title": "%command.selectUser%",
+        "icon": "$(organization)"
+      },
+      {
+        "command": "slurm.language",
+        "title": "%command.language%",
+        "icon": "$(globe)"
+      }
+    ],
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "slurm",
+          "title": "Slurm",
+          "icon": "media/slurm.svg"
+        }
+      ]
+    },
+    "views": {
+      "slurm": [
+        {
+          "id": "slurmJobs",
+          "name": "%view.jobs%"
+        }
+      ]
+    },
+    "viewsWelcome": [
+      {
+        "view": "slurmJobs",
+        "contents": "%view.welcome%",
+        "when": "!slurm.hasJobs"
+      }
+    ],
+    "menus": {
+      "view/title": [
+        {
+          "command": "slurm.refresh",
+          "when": "view == slurmJobs",
+          "group": "navigation@1"
+        },
+        {
+          "command": "slurm.filter",
+          "when": "view == slurmJobs",
+          "group": "navigation@3"
+        },
+        {
+          "command": "slurm.history",
+          "when": "view == slurmJobs",
+          "group": "navigation@4"
+        },
+        {
+          "command": "slurm.lookup",
+          "when": "view == slurmJobs",
+          "group": "navigation@5"
+        },
+        {
+          "command": "slurm.selectUser",
+          "when": "view == slurmJobs",
+          "group": "navigation@2"
+        },
+        {
+          "command": "slurm.language",
+          "when": "view == slurmJobs",
+          "group": "settings@1"
+        }
+      ],
+      "view/item/context": [
+        {
+          "command": "slurm.stdout",
+          "when": "view == slurmJobs && viewItem == slurmJob",
+          "group": "inline@1"
+        },
+        {
+          "command": "slurm.stderr",
+          "when": "view == slurmJobs && viewItem == slurmJob",
+          "group": "logs@1"
+        },
+        {
+          "command": "slurm.copyId",
+          "when": "view == slurmJobs && viewItem == slurmJob",
+          "group": "logs@2"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "Slurm Job Viewer",
+      "properties": {
+        "slurmJobs.user": {
+          "type": "string",
+          "default": "",
+          "scope": "machine",
+          "description": "%config.user%"
+        },
+        "slurmJobs.binDirectory": {
+          "type": "string",
+          "default": "",
+          "scope": "machine",
+          "description": "%config.binDirectory%"
+        },
+        "slurmJobs.refreshSeconds": {
+          "type": "integer",
+          "default": 30,
+          "minimum": 0,
+          "maximum": 3600,
+          "description": "%config.refreshSeconds%"
+        },
+        "slurmJobs.timeoutSeconds": {
+          "type": "integer",
+          "default": 20,
+          "minimum": 2,
+          "maximum": 120,
+          "description": "%config.timeoutSeconds%"
+        },
+        "slurmJobs.historyDays": {
+          "type": "integer",
+          "default": 7,
+          "minimum": 1,
+          "maximum": 365,
+          "description": "%config.historyDays%"
+        },
+        "slurmJobs.logTailKB": {
+          "type": "integer",
+          "default": 256,
+          "minimum": 4,
+          "maximum": 4096,
+          "description": "%config.logTailKB%"
+        },
+        "slurmJobs.language": {
+          "type": "string",
+          "default": "auto",
+          "enum": [
+            "auto",
+            "zh-cn",
+            "en"
+          ],
+          "description": "%config.language%",
+          "enumDescriptions": [
+            "%language.auto%",
+            "%language.zh%",
+            "%language.en%"
+          ]
+        }
+      }
+    }
+  },
+  "scripts": {
+    "compile": "tsc -p .",
+    "watch": "tsc -watch -p .",
+    "test": "npm run compile && node --test test/*.test.js",
+    "vscode:prepublish": "npm run compile",
+    "package": "vsce package --no-dependencies --allow-missing-repository"
+  },
+  "devDependencies": {
+    "@types/node": "^20.17.0",
+    "@types/vscode": "1.90.0",
+    "@vscode/vsce": "3.6.2",
+    "typescript": "^5.7.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/xx025/slurm-job-viewer.git"
+  },
+  "homepage": "https://github.com/xx025/slurm-job-viewer#readme",
+  "bugs": {
+    "url": "https://github.com/xx025/slurm-job-viewer/issues"
+  }
+}
