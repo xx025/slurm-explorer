@@ -2,7 +2,7 @@
   "name": "slurm-job-viewer",
   "displayName": "Slurm Job Viewer",
   "description": "%extension.description%",
-  "version": "0.2.1",
+  "version": "0.3.0",
   "publisher": "xx025",
   "license": "MIT",
   "engines": {

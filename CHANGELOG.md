@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.3.0
+
+- Moved job history into an expandable group in the left sidebar.
+- Open historical job details directly from the tree instead of a search picker.
+- Show finished jobs in reverse completion order and hide active queue jobs.
+- Added lazy history loading, empty states and inline retry after accounting errors.
+- Keep sidebar history synchronized with user scope, filters and interface language.
+
 ## 0.2.1
 
 - Set the Marketplace publisher to xx025.

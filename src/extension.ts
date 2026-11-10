@@ -6,10 +6,15 @@ import { Job, JobDetails, escapeHtml, groupFor, validateJobId } from "./model";
 import { Settings, SlurmClient } from "./slurm";
 import { logPath, readTail } from "./logs";
 import { createTranslator, errorMessage, resolveLanguage } from "./i18n";
+import { HistoryStore } from "./history";
 
 type Group = { kind: "group"; label: string; jobs: Job[] };
 type JobNode = { kind: "job"; job: Job };
-type Node = Group | JobNode;
+type HistoryGroup = { kind: "history" };
+type HistoryJobNode = { kind: "historyJob"; details: JobDetails };
+type HistoryStatus = { kind: "historyStatus"; status: "loading" | "error" | "empty" };
+type Node = Group | JobNode | HistoryGroup | HistoryJobNode | HistoryStatus;
+type JobInput = JobNode | HistoryJobNode | string;
 
 function config(): vscode.WorkspaceConfiguration {
   return vscode.workspace.getConfiguration("slurmJobs");
@@ -40,11 +45,74 @@ class JobTree implements vscode.TreeDataProvider<Node>, vscode.Disposable {
   readonly onDidChangeTreeData = this.emitter.event;
   jobs: Job[] = [];
   filter = "";
+  readonly historyRoot: HistoryGroup = { kind: "history" };
+  readonly history: HistoryStore;
+  historyRequested = false;
+
+  constructor(client: SlurmClient) {
+    this.history = new HistoryStore(() => client.history(), () => this.emitter.fire(undefined));
+  }
 
   update(jobs: Job[]): void { this.jobs = jobs; this.emitter.fire(undefined); }
   setFilter(value: string): void { this.filter = value; this.emitter.fire(undefined); }
 
+  private historyRecords(): JobDetails[] {
+    const active = new Set(this.jobs.map(job => job.id));
+    const needle = this.filter.toLowerCase();
+    return this.history.records.filter(record => !active.has(record.id) && (!needle ||
+      [record.id, record.fields.JobName, record.fields.User, record.fields.State, record.fields.Partition]
+        .some(value => value?.toLowerCase().includes(needle))));
+  }
+
+  refreshHistory(force = false): Promise<void> {
+    if (!this.historyRequested) { return Promise.resolve(); }
+    return this.history.load(force);
+  }
+
+  resetHistory(): void {
+    this.history.reset();
+    void this.refreshHistory();
+  }
+
   getTreeItem(element: Node): vscode.TreeItem {
+    if (element.kind === "history") {
+      const count = this.history.loaded ? ` (${this.historyRecords().length})` : "";
+      const item = new vscode.TreeItem(`${t("History")}${count}`, vscode.TreeItemCollapsibleState.Collapsed);
+      item.id = "group:History";
+      item.iconPath = new vscode.ThemeIcon("history");
+      item.contextValue = "slurmHistory";
+      item.description = t("Last {0} days", settings().historyDays);
+      item.tooltip = t("Finished jobs · {0} · last {1} days", userLabel(), settings().historyDays);
+      return item;
+    }
+    if (element.kind === "historyStatus") {
+      const label = element.status === "loading" ? t("Loading history…")
+        : element.status === "error" ? t("Could not load history. Click to retry.")
+          : this.filter ? t("No jobs match the current filter.") : t("No finished jobs in this time window.");
+      const item = new vscode.TreeItem(label);
+      item.id = "history:status";
+      item.iconPath = new vscode.ThemeIcon(element.status === "loading" ? "loading~spin" : element.status === "error" ? "warning" : "info");
+      if (element.status === "error") {
+        item.tooltip = message(this.history.error);
+        item.command = { command: "slurm.history", title: t("Retry history") };
+      }
+      return item;
+    }
+    if (element.kind === "historyJob") {
+      const { id, fields } = element.details;
+      const item = new vscode.TreeItem(`${id}  ${fields.JobName}`);
+      item.id = `historyJob:${id}`;
+      item.description = `${fields.User} · ${fields.State} · ${fields.Partition} · ${fields.Elapsed}`;
+      item.contextValue = "slurmJob";
+      item.command = { command: "slurm.details", title: t("Show Job Details"), arguments: [element] };
+      item.iconPath = new vscode.ThemeIcon(fields.State.startsWith("COMPLETED") ? "pass" : "circle-slash");
+      item.tooltip = [
+        t("Job: {0} ({1})", id, fields.JobName), t("User: {0}", fields.User),
+        t("State: {0}", fields.State), t("Partition: {0}", fields.Partition),
+        t("Start: {0} · End: {1} · Exit: {2}", fields.Start, fields.End, fields.ExitCode)
+      ].join("\n");
+      return item;
+    }
     if (element.kind === "group") {
       const item = new vscode.TreeItem(`${t(element.label)} (${element.jobs.length})`, vscode.TreeItemCollapsibleState.Expanded);
       item.id = `group:${element.label}`;
@@ -68,18 +136,34 @@ class JobTree implements vscode.TreeDataProvider<Node>, vscode.Disposable {
   }
 
   getChildren(element?: Node): Node[] {
-    if (element?.kind === "job") { return []; }
+    if (element?.kind === "history") {
+      this.historyRequested = true;
+      if (!this.history.loaded && !this.history.loading) { void this.history.load(); }
+      if (this.history.error) { return [{ kind: "historyStatus", status: "error" }]; }
+      const records = this.historyRecords();
+      const children: Node[] = records.map(details => ({ kind: "historyJob", details }));
+      if (this.history.loading) { children.push({ kind: "historyStatus", status: "loading" }); }
+      if (!children.length) { children.push({ kind: "historyStatus", status: "empty" }); }
+      return children;
+    }
+    if (element?.kind === "job" || element?.kind === "historyJob" || element?.kind === "historyStatus") { return []; }
     if (element?.kind === "group") { return element.jobs.map(job => ({ kind: "job", job })); }
     const needle = this.filter.toLowerCase();
     const jobs = this.jobs.filter(job => !needle || [
       job.id, job.name, job.state, job.partition, job.user, job.reason
     ].some(value => value.toLowerCase().includes(needle)));
-    return ["Running", "Pending", "Other"].map(label => ({
+    const groups: Node[] = ["Running", "Pending", "Other"].map(label => ({
       kind: "group" as const, label, jobs: jobs.filter(job => groupFor(job.state) === label)
     })).filter(group => group.jobs.length);
+    return [...groups, this.historyRoot];
   }
 
-  dispose(): void { this.emitter.dispose(); }
+  getParent(element: Node): Node | undefined {
+    if (element.kind === "historyJob" || element.kind === "historyStatus") { return this.historyRoot; }
+    return undefined;
+  }
+
+  dispose(): void { this.history.dispose(); this.emitter.dispose(); }
 }
 
 class LogProvider implements vscode.TextDocumentContentProvider, vscode.Disposable {
@@ -173,7 +257,7 @@ ${details.source === "sacct" ? escape(t("This job was loaded from accounting. Co
 export function activate(context: vscode.ExtensionContext): void {
   const output = vscode.window.createOutputChannel("Slurm Job Viewer");
   const client = new SlurmClient(settings, text => output.appendLine(`[${new Date().toISOString()}] ${text}`));
-  const tree = new JobTree();
+  const tree = new JobTree(client);
   const view = vscode.window.createTreeView("slurmJobs", { treeDataProvider: tree, showCollapseAll: true });
   const logs = new LogProvider();
   const panels = new Map<string, vscode.WebviewPanel>();
@@ -221,9 +305,10 @@ export function activate(context: vscode.ExtensionContext): void {
     return pendingRefresh;
   }
 
-  async function chooseId(input?: JobNode | string): Promise<string | undefined> {
+  async function chooseId(input?: JobInput): Promise<string | undefined> {
     if (typeof input === "string") { return validateJobId(input); }
     if (input?.kind === "job") { return validateJobId(input.job.id); }
+    if (input?.kind === "historyJob") { return validateJobId(input.details.id); }
     const value = await vscode.window.showInputBox({
       title: t("Find Slurm job"), prompt: t("Job ID, array element (123_4), or heterogeneous component (123+1)"),
       validateInput: value => { try { validateJobId(value); return undefined; } catch (error) { return message(error); } }
@@ -270,13 +355,16 @@ export function activate(context: vscode.ExtensionContext): void {
     panel.onDidDispose(() => { closed = true; receiver.dispose(); panels.delete(id); panelDetails.delete(id); });
   }
 
-  function register(name: string, action: (input?: JobNode | string) => unknown): void {
-    context.subscriptions.push(vscode.commands.registerCommand(name, async (input?: JobNode | string) => {
+  function register(name: string, action: (input?: JobInput) => unknown): void {
+    context.subscriptions.push(vscode.commands.registerCommand(name, async (input?: JobInput) => {
       try { await action(input); } catch (error) { void vscode.window.showErrorMessage(message(error)); }
     }));
   }
 
-  register("slurm.refresh", async () => { logs.refresh(); await refresh(); });
+  register("slurm.refresh", async () => {
+    logs.refresh();
+    await Promise.all([refresh(), tree.refreshHistory(true)]);
+  });
   register("slurm.output", () => output.show());
   register("slurm.selectUser", async () => {
     const ownUser = os.userInfo().username;
@@ -316,23 +404,20 @@ export function activate(context: vscode.ExtensionContext): void {
     });
     if (value !== undefined) { tree.setFilter(value.trim()); await refresh(); }
   });
-  register("slurm.details", async input => { const id = await chooseId(input); if (id) { await showDetails(id); } });
+  register("slurm.details", async input => {
+    const id = await chooseId(input);
+    if (id) { await showDetails(id, typeof input === "object" && input.kind === "historyJob" ? input.details : undefined); }
+  });
   register("slurm.lookup", async () => { const id = await chooseId(); if (id) { await showDetails(id); } });
   register("slurm.stdout", async input => { const id = await chooseId(input); if (id) { await openLog(id, "StdOut"); } });
   register("slurm.stderr", async input => { const id = await chooseId(input); if (id) { await openLog(id, "StdErr"); } });
   register("slurm.copyId", async input => { const id = await chooseId(input); if (id) { await vscode.env.clipboard.writeText(id); } });
   register("slurm.history", async () => {
-    const history = await vscode.window.withProgress({
-      location: vscode.ProgressLocation.Notification, title: t("Loading Slurm accounting history")
-    }, () => client.history());
-    if (!history.length) { void vscode.window.showInformationMessage(t("No jobs found in the configured accounting window.")); return; }
-    const picked = await vscode.window.showQuickPick(history.map(details => ({
-      label: `${details.id}  ${details.fields.JobName}`,
-      description: `${details.fields.User} · ${details.fields.State} · ${details.fields.Partition} · ${details.fields.Elapsed}`,
-      detail: t("Start: {0} · End: {1} · Exit: {2}", details.fields.Start, details.fields.End, details.fields.ExitCode),
-      details
-    })).reverse(), { title: t("Slurm history · {0} · last {1} days", userLabel(), settings().historyDays), matchOnDescription: true, matchOnDetail: true });
-    if (picked) { await showDetails(picked.details.id, picked.details); }
+    tree.historyRequested = true;
+    await vscode.commands.executeCommand("slurmJobs.focus");
+    const loading = tree.history.load(true);
+    await view.reveal(tree.historyRoot, { expand: true, select: false, focus: true });
+    await loading;
   });
 
   function configureTimer(): void {
@@ -340,7 +425,10 @@ export function activate(context: vscode.ExtensionContext): void {
     const seconds = config().get<number>("refreshSeconds", 30);
     if (seconds > 0) {
       timer = setInterval(() => {
-        if (view.visible) { void refresh(); }
+        if (view.visible) {
+          void refresh();
+          if (Date.now() - tree.history.loadedAt >= 60000) { void tree.refreshHistory(true); }
+        }
         logs.refresh();
       }, seconds * 1000);
     }
@@ -352,6 +440,9 @@ export function activate(context: vscode.ExtensionContext): void {
         if (event.affectsConfiguration("slurmJobs.user")) {
           tree.update([]);
           void vscode.commands.executeCommand("setContext", "slurm.hasJobs", false);
+        }
+        if (event.affectsConfiguration("slurmJobs.user") || event.affectsConfiguration("slurmJobs.historyDays")) {
+          tree.resetHistory();
         }
         if (event.affectsConfiguration("slurmJobs.language")) {
           tree.update(tree.jobs);

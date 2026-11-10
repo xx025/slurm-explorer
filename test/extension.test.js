@@ -11,7 +11,8 @@ const settle = () => new Promise(resolve => setImmediate(resolve));
 function harness(initialGate) {
   const state = {
     values: { refreshSeconds: 0 }, configurationListeners: [], commands: new Map(),
-    selections: [], inputs: [], queries: [], panels: [], errors: []
+    selections: [], inputs: [], queries: [], panels: [], errors: [],
+    historyQueries: [], quickPickCalls: 0, executed: [], revealed: []
   };
   class EventEmitter {
     event = () => disposable();
@@ -25,6 +26,12 @@ function harness(initialGate) {
     elapsed: "1:00", timeLimit: "2:00", nodes: "1", cpus: "4", memory: "8G",
     resources: "gpu:1", reason: "node01"
   }));
+  state.historyData = [
+    { id: "100", source: "sacct", raw: "", fields: { JobName: "finished-train", User: own, State: "COMPLETED", Partition: "gpu", Elapsed: "10:00", Start: "2026-11-10T10:00:00", End: "2026-11-10T10:10:00", ExitCode: "0:0" } },
+    { id: "101", source: "sacct", raw: "", fields: { JobName: "failed-train", User: own, State: "FAILED", Partition: "gpu", Elapsed: "1:00", Start: "2026-11-10T11:00:00", End: "2026-11-10T11:01:00", ExitCode: "1:0" } },
+    { id: "99", source: "sacct", raw: "", fields: { JobName: "other-train", User: other, State: "TIMEOUT", Partition: "gpu", Elapsed: "2:00", Start: "2026-11-10T09:00:00", End: "2026-11-10T09:02:00", ExitCode: "0:15" } },
+    { id: "42", source: "sacct", raw: "", fields: { JobName: "train", User: own, State: "RUNNING", Partition: "gpu", Elapsed: "1:00", Start: "2026-11-10T12:00:00", End: "Unknown", ExitCode: "0:0" } }
+  ];
   const configuration = {
     get: (key, fallback) => state.values[key] ?? fallback,
     update: async (key, value) => {
@@ -39,7 +46,7 @@ function harness(initialGate) {
     EventEmitter,
     TreeItem: class { constructor(label) { this.label = label; } },
     ThemeIcon: class {},
-    TreeItemCollapsibleState: { Expanded: 2 },
+    TreeItemCollapsibleState: { Expanded: 2, Collapsed: 1 },
     ConfigurationTarget: { Global: 1 },
     ViewColumn: { Active: -1 },
     ProgressLocation: { Notification: 15 },
@@ -58,10 +65,14 @@ function harness(initialGate) {
       createOutputChannel: () => ({ ...disposable(), appendLine() {}, show() {} }),
       createTreeView: (_id, options) => {
         state.tree = options.treeDataProvider;
-        state.view = { ...disposable(), visible: true, onDidChangeVisibility: () => disposable() };
+        state.view = {
+          ...disposable(), visible: true, onDidChangeVisibility: () => disposable(),
+          reveal: async (element, options) => { state.revealed.push({ element, options }); state.tree.getChildren(element); }
+        };
         return state.view;
       },
       showQuickPick: async items => {
+        state.quickPickCalls++;
         const selection = state.selections.shift();
         return items.find(item => item.value === selection);
       },
@@ -83,7 +94,7 @@ function harness(initialGate) {
     },
     commands: {
       registerCommand(name, handler) { state.commands.set(name, handler); return disposable(); },
-      executeCommand: async () => {}
+      executeCommand: async (...args) => { state.executed.push(args); }
     }
   };
   let gated = false;
@@ -98,7 +109,12 @@ function harness(initialGate) {
     async details(id) {
       return { id, source: "scontrol", fields: { JobId: id, JobName: "<script>test</script>", JobState: "RUNNING" }, raw: "JobId=" + id };
     }
-    async history() { return []; }
+    async history() {
+      const user = this.readSettings().user;
+      state.historyQueries.push(user);
+      if (state.historyHandler) { return state.historyHandler(user); }
+      return state.historyData.filter(record => user === "*" || record.fields.User === user);
+    }
   }
   const filename = path.join(__dirname, "../dist/extension.js");
   const realRequire = createRequire(filename);
@@ -163,4 +179,73 @@ test("a pending own-user query cannot replace results after switching to all use
     assert.equal(app.tree.jobs.length, 2);
     assert.match(app.view.message, /All users/);
   } finally { release(); app.dispose(); }
+});
+
+test("history is a lazy sidebar group; the history command expands it without a picker", async () => {
+  const app = harness();
+  try {
+    await settle();
+    const root = app.tree.getChildren().at(-1);
+    assert.equal(root.kind, "history");
+    assert.equal(app.historyQueries.length, 0);
+    assert.equal(app.tree.getTreeItem(root).label, "History");
+    const pending = app.tree.getChildren(root);
+    assert.equal(pending[0].status, "loading");
+    await app.tree.history.load();
+    const children = app.tree.getChildren(root);
+    assert.deepEqual(children.map(child => child.details.id), ["101", "100"]);
+    assert.equal(app.tree.getTreeItem(root).label, "History (2)");
+    await app.run("slurm.details", children[0]);
+    assert.match(app.panels[0].webview.html, /failed-train/);
+    assert.match(app.panels[0].webview.html, /sacct/);
+    await app.run("slurm.history");
+    assert.equal(app.quickPickCalls, 0);
+    assert.equal(app.revealed.at(-1).element, root);
+    assert.equal(app.revealed.at(-1).options.expand, true);
+  } finally { app.dispose(); }
+});
+
+test("history follows user scope, filtering and language changes", async () => {
+  const app = harness();
+  try {
+    await settle();
+    await app.run("slurm.history");
+    app.selections.push("*");
+    await app.run("slurm.selectUser");
+    await app.tree.history.load();
+    assert.equal(app.tree.getChildren(app.tree.historyRoot).length, 3);
+    app.tree.setFilter("TIMEOUT");
+    assert.deepEqual(app.tree.getChildren(app.tree.historyRoot).map(child => child.details.id), ["99"]);
+    app.tree.setFilter("");
+    app.selections.push("custom");
+    app.inputs.push(app.other);
+    await app.run("slurm.selectUser");
+    await app.tree.history.load();
+    assert.deepEqual(app.tree.getChildren(app.tree.historyRoot).map(child => child.details.fields.User), [app.other]);
+    app.selections.push("zh-cn");
+    await app.run("slurm.language");
+    await settle();
+    assert.equal(app.tree.getTreeItem(app.tree.historyRoot).label, "历史 (1)");
+  } finally { app.dispose(); }
+});
+
+test("failed history queries can be retried in the sidebar and empty history remains visible", async () => {
+  const app = harness();
+  try {
+    await settle();
+    app.historyHandler = async () => { throw new Error("Accounting unavailable"); };
+    await app.run("slurm.history");
+    let [status] = app.tree.getChildren(app.tree.historyRoot);
+    assert.equal(status.status, "error");
+    assert.equal(app.tree.getTreeItem(status).tooltip, "Accounting unavailable");
+    assert.equal(app.tree.getTreeItem(status).command.command, "slurm.history");
+    app.historyHandler = async () => [];
+    await app.run("slurm.history");
+    [status] = app.tree.getChildren(app.tree.historyRoot);
+    assert.equal(status.status, "empty");
+    app.tree.update([]);
+    assert.deepEqual(app.tree.getChildren(), [app.tree.historyRoot]);
+    assert.equal(app.quickPickCalls, 0);
+    assert.deepEqual(app.errors, []);
+  } finally { app.dispose(); }
 });

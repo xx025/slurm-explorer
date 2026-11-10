@@ -2,6 +2,7 @@
 const os = require("node:os");
 const { SlurmClient, runCommand } = require("../dist/slurm");
 const { logPath, readTail } = require("../dist/logs");
+const { finishedHistory } = require("../dist/history");
 
 async function check() {
   const user = os.userInfo().username;
@@ -36,6 +37,11 @@ async function check() {
   }
   const history = await client.history();
   report.historyCount = history.length;
+  const finished = finishedHistory(history).filter(record => !jobs.some(job => job.id === record.id));
+  report.sidebarHistory = {
+    finishedCount: finished.length,
+    latest: finished.slice(0, 3).map(record => ({ id: record.id, state: record.fields.State, end: record.fields.End }))
+  };
   const historical = [...history].reverse().find(job =>
     !["RUNNING", "PENDING", "COMPLETING"].includes(job.fields.State) && /^\d+(?:_\d+)?(?:\+\d+)?$/.test(job.id)
   );
@@ -53,6 +59,7 @@ async function check() {
     historyCount: allHistory.length,
     users: [...new Set(allJobs.map(job => job.user))].sort()
   };
+  report.allUsers.finishedHistoryCount = finishedHistory(allHistory).filter(record => !allJobs.some(job => job.id === record.id)).length;
   const other = allJobs.find(job => job.user !== user);
   if (other) {
     const namedClient = new SlurmClient(() => ({

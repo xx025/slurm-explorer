@@ -7,7 +7,7 @@
 ## 安装与连接
 
 1. 在 VS Code 安装 **Remote - SSH**，连接你的 Slurm 登录节点，例如 `node42`。
-2. 在远端窗口执行 **Extensions: Install from VSIX...**，选择 `slurm-job-viewer-0.2.1.vsix`。
+2. 在远端窗口执行 **Extensions: Install from VSIX...**，选择 `slurm-job-viewer-0.3.0.vsix`。
 3. 确认扩展安装在 **SSH 主机**上。如果扩展列表显示 **Install in SSH: ...**，点击该按钮。
 4. 点击左侧服务器图标 **Slurm**。默认展示远端当前系统用户的任务。
 
@@ -18,10 +18,11 @@
 - 支持中文和英文，默认跟随 VS Code 显示语言。
 - 工具栏提供“选择用户范围”，可以切换仅自己、所有用户、指定用户；任务列表和历史记录共用所选范围。
 - 任务按 Running / Pending / Other 分组。
+- 任务树底部固定显示“历史”分组，展开后查看已完成、失败、取消、超时等已结束任务，按结束时间从新到旧排列。
 - 显示任务 ID、名称、用户、状态、分区、运行时长、时间限制、CPU、请求内存、GRES 和排队原因。
 - 点击任务打开详情，包含申请/分配资源、节点、退出码、工作目录、启动命令和日志路径。
 - 工具栏筛选任务，支持任务 ID、名称、状态、用户、分区和排队原因。
-- 使用历史按钮查看最近七天的记账记录；可以在设置中修改时间窗口。
+- 点击左侧历史任务直接打开详情；顶部历史按钮会定位并展开该分组。默认查询最近七天，可以在设置中修改时间窗口。
 - 按 ID 查找任务，支持数组任务 `123_4` 和异构任务组件 `123+1`。
 - 打开 stdout / stderr 的只读尾部预览，默认最多读取末尾 256 KiB。
 - 控制器返回空的 stderr 路径时，按照批处理任务默认行为打开合并后的 stdout 日志。
@@ -38,7 +39,7 @@
 | Select User Scope / 选择用户范围 | 切换仅自己、所有用户或指定用户 |
 | Change Interface Language / 切换界面语言 | 跟随 VS Code、简体中文或 English |
 | Filter Jobs | 筛选当前任务；清空输入恢复全部 |
-| Show Job History | 查看配置窗口内的历史任务 |
+| Show Job History | 定位、展开并刷新左侧“历史”分组 |
 | Find Job by ID | 查询指定任务 |
 | Open Standard Output / Error | 选择任务并打开日志 |
 | Show Query Output | 查看查询命令和错误信息 |
@@ -73,6 +74,8 @@
 
 点击任务栏顶部的用户图标，选择 **所有用户**，即可查看当前账号有权看到的各用户任务；也可以选择 **指定用户** 输入用户名。任务行和历史列表会显示所属用户。
 
+左侧“历史”首次展开时加载数据，之后可点击刷新按钮重新查询；历史加载失败时，可点击分组内的提示重试。已展开过历史且任务视图可见时，历史查询最多每分钟自动刷新一次。顶部文字筛选同时作用于当前任务和历史记录。
+
 通过视图右上角的更多操作菜单，或命令面板的 **Slurm: 切换界面语言 / Change Interface Language**，选择跟随 VS Code、简体中文或英文。切换后，已打开的详情页和日志预览也会更新。原生命令、菜单和设置名称使用 VS Code 的显示语言；手动语言设置影响任务树、详情、提示和日志预览。Slurm 返回的任务状态码、字段原名、排队原因和日志正文保留原文。
 
 查看其他人的任务和日志仍使用当前 SSH 登录账号的权限。集群启用了 `PrivateData` 等访问限制，或日志文件没有读取权限时，插件会显示查询结果或权限错误，不会提升权限。
@@ -97,7 +100,7 @@
 ```bash
 npm ci
 npm test
-npm run package -- --out ../slurm-job-viewer-0.2.1.vsix
+npm run package -- --out ../slurm-job-viewer-0.3.0.vsix
 ```
 
 运行 `npm run compile` 后，在 VS Code 打开源码目录，按 F5 启动扩展开发窗口。使用 Remote-SSH 在登录节点打开源码目录，可以直接调试真实 Slurm 查询。
@@ -118,6 +121,6 @@ Marketplace Publisher ID 为 `xx025`，对应扩展 ID 为 `xx025.slurm-job-view
 | Workflow | `publish.yml` |
 | Environment | 留空 |
 
-工作流位于 `.github/workflows/publish.yml`。手动运行时，`publish=false` 只测试、打包并上传构建附件；`publish=true` 使用 OIDC 发布到市场。正式发布 GitHub Release 时也会触发市场发布，Release 标签必须与 `package.json` 的版本匹配，例如 `v0.2.1`。
+工作流位于 `.github/workflows/publish.yml`。手动运行时，`publish=false` 只测试、打包并上传构建附件；`publish=true` 使用 OIDC 发布到市场。正式发布 GitHub Release 时也会触发市场发布，Release 标签必须与 `package.json` 的版本匹配，例如 `v0.3.0`。
 
 English documentation is included as `README.en.md`.
