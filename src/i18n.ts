@@ -5,6 +5,7 @@ const chinese: Record<string, string> = {
   "Jobs": "任务",
   "Following · updated {0}": "跟踪中 · 更新于 {0}",
   "Retrying automatically…": "正在自动重试…",
+  "{0} path is unavailable. Slurm did not retain a log path for this job.": "无法获取 {0} 路径。Slurm 未保留此任务的日志路径。",
   "Paused": "已暂停",
   "Resume": "继续",
   "Pause": "暂停",

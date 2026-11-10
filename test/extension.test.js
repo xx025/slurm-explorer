@@ -12,12 +12,13 @@ function harness(initialGate) {
   const state = {
     values: { refreshSeconds: 0 }, configurationListeners: [], commands: new Map(),
     selections: [], inputs: [], queries: [], panels: [], errors: [],
-    historyQueries: [], quickPickCalls: 0, executed: [], revealed: []
+    historyQueries: [], quickPickCalls: 0, executed: [], revealed: [], terminals: []
   };
   class EventEmitter {
-    event = () => disposable();
-    fire() {}
-    dispose() {}
+    listeners = [];
+    event = listener => { this.listeners.push(listener); return disposable(); };
+    fire(data) { this.listeners.forEach(listener => listener(data)); }
+    dispose() { this.listeners = []; }
   }
   const own = os.userInfo().username;
   const other = own === "bob" ? "alice" : "bob";
@@ -62,7 +63,15 @@ function harness(initialGate) {
       }
     },
     window: {
-      registerWebviewViewProvider: (_id, provider) => { state.outputProvider = provider; return disposable(); },
+      createTerminal: options => {
+        let opened = false, closed = false;
+        const terminal = { name: options.name, text: "", pty: options.pty,
+          show() { api.window.activeTerminal = terminal; if (!opened) { opened = true; options.pty.open(); } },
+          dispose() { if (!closed) { closed = true; options.pty.close(); } }
+        };
+        options.pty.onDidWrite(data => { terminal.text += data; });
+        state.terminals.push(terminal); return terminal;
+      },
       createOutputChannel: () => ({ ...disposable(), appendLine() {}, show() {} }),
       createTreeView: (_id, options) => {
         state.tree = options.treeDataProvider;
@@ -110,6 +119,10 @@ function harness(initialGate) {
     async details(id) {
       if (state.detailsHandler) { return state.detailsHandler(id); }
       return { id, source: "scontrol", fields: { JobId: id, JobName: "<script>test</script>", JobState: "RUNNING", ...(state.logFile ? {StdOut: state.logFile, StdErr: ""} : {}) }, raw: "JobId=" + id };
+    }
+    async logDetails(id, known) {
+      if (state.logDetailsHandler) { return state.logDetailsHandler(id, known); }
+      return known ?? this.details(id);
     }
     async history() {
       const user = this.readSettings().user;
@@ -170,84 +183,91 @@ test("extension user selection and language commands update real providers and o
   } finally { app.dispose(); }
 });
 
-test("late reads and controller lookups cannot overwrite a newly selected job", async () => {
-  const directory = fs.mkdtempSync(path.join(os.tmpdir(), "slurm-switch-"));
-  const first = path.join(directory, "first.log");
-  const second = path.join(directory, "second.log");
-  fs.writeFileSync(first, "first\n");
-  fs.writeFileSync(second, "second\n");
-  const app = harness();
-  const messages = [];
-  app.outputProvider.resolveWebviewView({
-    webview: { html:"", postMessage:async data=>messages.push(data), onDidReceiveMessage:()=>disposable() },
-    onDidDispose:()=>disposable()
-  });
-  try {
-    app.logFile = first;
-    await app.run("slurm.stdout", "42");
-    let releaseRead;
-    app.outputProvider.cursor.read = () => new Promise(resolve => { releaseRead = resolve; });
-    const pendingRead = app.outputProvider.poll();
-    app.logFile = second;
-    await app.run("slurm.stdout", "43");
-    releaseRead({text:"late first\n",reset:false,skipped:false});
-    await pendingRead;
-    assert.equal(messages.at(-1).text, "second\n");
-    assert.equal(messages.at(-1).title, "Job 43");
-    let releaseLookup;
-    app.detailsHandler = id => id === "42" ? new Promise(resolve => {releaseLookup=resolve;})
-      : Promise.resolve({id,source:"scontrol",fields:{StdOut:second},raw:""});
-    const pendingLookup = app.run("slurm.stdout", "42");
-    await settle();
-    await app.run("slurm.stdout", "43");
-    releaseLookup({id:"42",source:"scontrol",fields:{StdOut:first},raw:""});
-    await pendingLookup;
-    assert.equal(messages.at(-1).title, "Job 43");
-    assert.equal(messages.at(-1).text, "second\n");
-  } finally { app.dispose(); fs.rmSync(directory,{recursive:true}); }
-});
-
-test("opening stdout focuses the bottom view and follows incremental content", async () => {
+test("native terminal tabs retain separate task streams, deduplicate and pause independently", async () => {
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), "slurm-output-"));
   const filename = path.join(directory, "job.log");
   fs.writeFileSync(filename, "epoch 1\n");
   const app = harness();
-  const messages = [];
-  let receive;
-  const view = {
-    webview: {
-      html: "", postMessage: async data => { messages.push(data); },
-      onDidReceiveMessage: handler => { receive = handler; return disposable(); }
-    },
-    onDidDispose: () => disposable()
-  };
   try {
     app.logFile = filename;
-    app.outputProvider.resolveWebviewView(view);
     await app.run("slurm.stdout", "42");
-    assert.ok(app.executed.some(([command]) => command === "slurmLogOutput.focus"));
-    assert.equal(messages.at(-1).text, "epoch 1\n");
-    await receive({action:"pause"});
+    assert.equal(app.terminals.length, 1);
+    const first = app.terminals[0];
+    assert.equal(first.name, "Slurm 42 · stdout");
+    assert.match(first.text, /epoch 1\r\n$/);
+    await app.run("slurm.pauseOutput");
     fs.appendFileSync(filename, "epoch 2\n");
-    await app.outputProvider.poll();
-    assert.equal(messages.at(-1).text, "epoch 1\n");
-    await receive({action:"pause"});
-    assert.equal(messages.at(-1).text, "epoch 1\nepoch 2\n");
-    await receive({action:"clear"});
+    await app.run("slurm.stdout", "43");
+    assert.equal(app.terminals.length, 2);
+    const second = app.terminals[1];
+    assert.doesNotMatch(first.text, /epoch 2/);
+    assert.match(second.text, /epoch 1\r\nepoch 2\r\n$/);
+    await app.run("slurm.stdout", "42");
+    assert.equal(app.terminals.length, 2);
+    assert.doesNotMatch(first.text, /epoch 2/);
+    await app.run("slurm.resumeOutput");
+    await settle();
+    await app.run("slurm.stdout", "42");
+    assert.match(first.text, /epoch 2\r\n$/);
+    await app.run("slurm.stderr", "42");
+    assert.equal(app.terminals.length, 3);
+    assert.equal(app.terminals[2].name, "Slurm 42 · stderr");
+    await app.run("slurm.clearOutput");
+    assert.ok(app.terminals[2].text.endsWith("\x1b[2J\x1b[3J\x1b[H"));
+    first.dispose();
     fs.appendFileSync(filename, "epoch 3\n");
-    await app.outputProvider.poll();
-    assert.equal(messages.at(-1).text, "epoch 3\n");
-    await receive({action:"stream",stream:"StdErr"});
-    assert.equal(messages.at(-1).stream, "StdErr");
-    assert.equal(messages.at(-1).text, "epoch 1\nepoch 2\nepoch 3\n");
-    app.selections.push("zh-cn");
-    await app.run("slurm.language");
-    assert.match(view.webview.html, /自动滚动/);
-    await receive({action:"stop"});
-    await receive({action:"ready"});
-    assert.equal(messages.at(-1).active, false);
+    const snapshot = first.text;
+    await app.run("slurm.stdout", "42");
+    assert.equal(app.terminals.length, 4);
+    assert.equal(first.text, snapshot);
+    assert.match(app.terminals[3].text, /epoch 3\r\n$/);
     assert.deepEqual(app.errors, []);
   } finally { app.dispose(); fs.rmSync(directory, {recursive:true}); }
+});
+
+test("history output enriches known accounting metadata before opening a native tab", async () => {
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), "slurm-history-log-"));
+  const filename = path.join(directory, "history.log");
+  fs.writeFileSync(filename, "finished\n");
+  const app = harness();
+  try {
+    const known = app.historyData[0];
+    app.logDetailsHandler = async (id, details) => {
+      assert.equal(id, known.id); assert.equal(details, known);
+      return {...details, fields: {...details.fields, StdOut:filename}};
+    };
+    await app.run("slurm.stdout", {kind:"historyJob", details:known});
+    assert.match(app.terminals[0].text, /finished\r\n$/);
+    app.logDetailsHandler = async (_id, details) => details;
+    await app.run("slurm.stdout", {kind:"historyJob", details:app.historyData[1]});
+    assert.equal(app.terminals.length, 1);
+    assert.match(app.errors[0], /did not retain a log path/);
+  } finally { app.dispose(); fs.rmSync(directory,{recursive:true}); }
+});
+
+test("concurrent log lookups keep both native tabs without stealing focus from the latest click", async () => {
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), "slurm-native-switch-"));
+  const filename = path.join(directory,"job.log");
+  fs.writeFileSync(filename,"output\n");
+  const app = harness();
+  let release;
+  try {
+    app.logDetailsHandler = id => id === "42" ? new Promise(resolve => { release = resolve; })
+      : Promise.resolve({id,source:"scontrol",fields:{StdOut:filename},raw:""});
+    const first = app.run("slurm.stdout","42");
+    await settle();
+    await app.run("slurm.stdout","43");
+    release({id:"42",source:"scontrol",fields:{StdOut:filename},raw:""});
+    await first;
+    app.logDetailsHandler = async id => ({id,source:"scontrol",fields:{StdOut:filename},raw:""});
+    assert.deepEqual(app.terminals.map(terminal=>terminal.name),["Slurm 43 · stdout","Slurm 42 · stdout"]);
+    await app.run("slurm.pauseOutput");
+    fs.appendFileSync(filename,"more\n");
+    await app.run("slurm.stdout","43");
+    assert.doesNotMatch(app.terminals[0].text,/more/);
+    await app.run("slurm.stdout","42");
+    assert.match(app.terminals[1].text,/more\r\n$/);
+  } finally { app.dispose(); fs.rmSync(directory,{recursive:true}); }
 });
 
 test("a pending own-user query cannot replace results after switching to all users", async () => {

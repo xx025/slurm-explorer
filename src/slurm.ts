@@ -30,6 +30,7 @@ export const runCommand: Runner = (command, args, timeoutMs) => new Promise((res
 });
 
 export class SlurmClient {
+  private logFields?: { directory: string; promise: Promise<Set<string>> };
   constructor(
     private readonly settings: () => Settings,
     private readonly log: (message: string) => void,
@@ -90,5 +91,36 @@ export class SlurmClient {
         accountError instanceof Error ? accountError : String(accountError)
       ]);
     }
+  }
+
+  async logDetails(value: string, known?: JobDetails): Promise<JobDetails> {
+    const id = validateJobId(value);
+    const details = known ?? await this.details(id);
+    if (details.source === "scontrol" || details.fields.StdOut || details.fields.StdErr) { return details; }
+    // Query log metadata only when opening a history log, so old Slurm versions
+    // without these fields can still display their normal accounting history.
+    const directory = this.settings().binDirectory;
+    if (!this.logFields || this.logFields.directory !== directory) {
+      this.logFields = { directory, promise: this.run("sacct", ["--helpformat"]).then(text => new Set(text.toLowerCase().split(/\s+/))) };
+    }
+    let supported: Set<string>;
+    try { supported = await this.logFields.promise; }
+    catch (error) { this.logFields = undefined; throw error; }
+    if (!supported.has("stdout") && !supported.has("stderr")) { return details; }
+    const fields = ["JobID", "JobIDRaw", "StdOut", "StdErr", "WorkDir", "JobName", "User"]
+      .filter(field => supported.has(field.toLowerCase()));
+    if (!fields.includes("JobID")) { return details; }
+    const date = new Date(Date.now() - this.settings().historyDays * 86400000);
+    const start = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+    const raw = await this.run("sacct", ["--noheader", "--parsable2", `--delimiter=${SEPARATOR}`, "--allocations", "--array",
+      `--jobs=${id}`, `--starttime=${start}`, `--format=${fields.map(field => `${field}%4096`).join(",")}`]);
+    for (const line of raw.split(/\r?\n/)) {
+      const values = line.split(SEPARATOR);
+      if (values[0]?.trim() !== id || values.length < fields.length) { continue; }
+      const enriched = { ...details.fields };
+      fields.forEach((field, index) => { enriched[field] = values[index].trim(); });
+      return { ...details, fields: enriched };
+    }
+    return details;
   }
 }

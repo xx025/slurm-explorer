@@ -15,13 +15,15 @@
   "view.welcome": "Connect to a Slurm login node with Remote-SSH and install this extension on that host.\n[Select user scope](command:slurm.selectUser)\n[Refresh jobs](command:slurm.refresh)\n[Find job by ID](command:slurm.lookup)\n[Show query output](command:slurm.output)",
   "config.user": "Slurm user to query. Empty uses the remote OS user. Use * for all users.",
   "config.binDirectory": "Absolute directory containing squeue, scontrol and sacct. Empty uses the extension host PATH.",
-  "config.refreshSeconds": "Refresh interval for the visible task list. 0 disables queue refresh. The output panel follows logs independently every 2 seconds.",
+  "config.refreshSeconds": "Refresh interval for the visible task list. 0 disables queue refresh. Each log terminal follows output independently every 2 seconds.",
   "config.timeoutSeconds": "Maximum time for each Slurm query.",
   "config.historyDays": "Lookback window for accounting history and job lookup.",
-  "config.logTailKB": "Maximum bytes per log read in KiB. The first read tails the file; the panel retains a bounded amount of output.",
+  "config.logTailKB": "Maximum bytes per log read in KiB, initially from the file tail. Display retention follows the native terminal scrollback setting.",
   "config.language": "Language for the task list, details, prompts and logs. Native command and settings labels follow the VS Code display language.",
   "language.auto": "Follow VS Code display language.",
   "language.zh": "Simplified Chinese.",
   "language.en": "English.",
-  "panel.output": "Slurm Output"
+  "command.pauseOutput": "Slurm: Pause Current Output",
+  "command.resumeOutput": "Slurm: Resume Current Output",
+  "command.clearOutput": "Slurm: Clear Current Output"
 }

@@ -2,7 +2,7 @@
   "name": "slurm-job-viewer",
   "displayName": "Slurm Job Viewer",
   "description": "%extension.description%",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "publisher": "xx025",
   "license": "MIT",
   "engines": {
@@ -22,8 +22,7 @@
   ],
   "main": "./dist/extension.js",
   "activationEvents": [
-    "onView:slurmJobs",
-    "onView:slurmLogOutput"
+    "onView:slurmJobs"
   ],
   "capabilities": {
     "untrustedWorkspaces": {
@@ -84,6 +83,21 @@
         "command": "slurm.language",
         "title": "%command.language%",
         "icon": "$(globe)"
+      },
+      {
+        "command": "slurm.pauseOutput",
+        "title": "%command.pauseOutput%",
+        "icon": "$(debug-pause)"
+      },
+      {
+        "command": "slurm.resumeOutput",
+        "title": "%command.resumeOutput%",
+        "icon": "$(play)"
+      },
+      {
+        "command": "slurm.clearOutput",
+        "title": "%command.clearOutput%",
+        "icon": "$(clear-all)"
       }
     ],
     "viewsContainers": {
@@ -93,13 +107,6 @@
           "title": "Slurm",
           "icon": "media/slurm.svg"
         }
-      ],
-      "panel": [
-        {
-          "id": "slurmOutput",
-          "title": "%panel.output%",
-          "icon": "media/slurm.svg"
-        }
       ]
     },
     "views": {
@@ -107,13 +114,6 @@
         {
           "id": "slurmJobs",
           "name": "%view.jobs%"
-        }
-      ],
-      "slurmOutput": [
-        {
-          "type": "webview",
-          "id": "slurmLogOutput",
-          "name": "%panel.output%"
         }
       ]
     },

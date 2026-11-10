@@ -235,7 +235,6 @@ export function activate(context: vscode.ExtensionContext): void {
   let disposed = false;
   let logRequest = 0;
   context.subscriptions.push(output, tree, view, jobOutput,
-    vscode.window.registerWebviewViewProvider("slurmLogOutput", jobOutput),
   );
 
   async function refresh(force = false): Promise<void> {
@@ -283,9 +282,9 @@ export function activate(context: vscode.ExtensionContext): void {
 
   async function openLog(id: string, stream: "StdOut" | "StdErr", known?: JobDetails): Promise<void> {
     const request = ++logRequest;
-    const details = known ?? await client.details(id);
-    if (disposed || request !== logRequest) { return; }
-    await jobOutput.follow(details, stream);
+    const details = await client.logDetails(id, known);
+    if (disposed) { return; }
+    await jobOutput.follow(details, stream, request === logRequest);
   }
 
   async function showDetails(id: string, known?: JobDetails): Promise<void> {
@@ -330,6 +329,9 @@ export function activate(context: vscode.ExtensionContext): void {
     await Promise.all([refresh(), tree.refreshHistory(true)]);
   });
   register("slurm.output", () => output.show());
+  register("slurm.pauseOutput", () => jobOutput.pause(true));
+  register("slurm.resumeOutput", () => jobOutput.pause(false));
+  register("slurm.clearOutput", () => jobOutput.clear());
   register("slurm.selectUser", async () => {
     const ownUser = os.userInfo().username;
     const configured = config().get<string>("user", "").trim();
@@ -414,7 +416,6 @@ export function activate(context: vscode.ExtensionContext): void {
           tree.resetHistory();
         }
         if (event.affectsConfiguration("slurmJobs.language")) {
-          jobOutput.render();
           tree.update(tree.jobs);
           for (const [id, panel] of panels) {
             const details = panelDetails.get(id);

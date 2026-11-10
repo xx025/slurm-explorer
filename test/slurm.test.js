@@ -123,3 +123,36 @@ test("tail reads only the bounded suffix, handles empty files, and rejects direc
 test("webview field escaping prevents HTML injection", () => {
   assert.equal(escapeHtml('<script x="a">&\'</script>'), "&lt;script x=&quot;a&quot;&gt;&amp;&#39;&lt;/script&gt;");
 });
+
+test("history log metadata uses exact job IDs, full paths and raw array IDs", async () => {
+  const calls = [];
+  const client = new SlurmClient(defaultSettings, () => {}, async (command, args) => {
+    calls.push(args);
+    if (args.includes("--helpformat")) { return "JobID JobIDRaw StdOut StdErr WorkDir JobName User"; }
+    return [
+      ["999", "999", "/wrong", "", "/shared", "other", "bob"].join(SEPARATOR),
+      ["123_4", "127", "out_%A_%a_%j.log", "err_%04a.log", "/shared/run with spaces", "train", "alice"].join(SEPARATOR)
+    ].join("\n");
+  });
+  const known = parseAccounting(accountingLine)[0];
+  const result = await client.logDetails("123_4", known);
+  assert.equal(logPath(result, "StdOut"), "/shared/run with spaces/out_123_4_127.log");
+  assert.equal(logPath(result, "StdErr"), "/shared/run with spaces/err_0004.log");
+  assert.equal(result.fields.State, "COMPLETED");
+  assert.ok(calls[1].includes("--jobs=123_4"));
+  assert.ok(calls[1].includes("--array"));
+  assert.ok(calls[1].some(arg => arg.includes("StdOut%4096")));
+  await client.logDetails("123_4", known);
+  assert.equal(calls.filter(args => args.includes("--helpformat")).length, 1);
+});
+
+test("old accounting without log fields keeps history working and does not invent paths", async () => {
+  const known = parseAccounting(accountingLine)[0];
+  const client = new SlurmClient(defaultSettings, () => {}, async (_command, args) => {
+    assert.deepEqual(args, ["--helpformat"]);
+    return "JobID JobName User WorkDir";
+  });
+  const result = await client.logDetails("123_4", known);
+  assert.equal(result, known);
+  assert.throws(() => logPath(result, "StdOut"), /did not retain a log path/);
+});

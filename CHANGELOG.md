@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.5.0
+
+- Follow each job / stream in a native VS Code terminal tab; retain independent followers and reuse existing tabs.
+- Preserve progress carriage returns and ANSI, and normalize bare LF to CRLF for correct terminal line breaks.
+- Enrich historical log metadata from accounting when supported; report missing paths without a manual file prompt.
+- Add commands to pause, resume and clear the selected output terminal.
+
 ## 0.4.0
 
 - Follow stdout / stderr in a dedicated bottom Slurm Output panel, updating every 2 seconds.

@@ -11,12 +11,12 @@ export function logPath(details: JobDetails, stream: "StdOut" | "StdErr"): strin
     filename = fields.StdOut;
   }
   if (!filename || /^(?:\(null\)|Unknown|N\/A|None)$/i.test(filename)) {
-    throw new UserError("{0} path is unavailable. Completed jobs may have left the controller; open their known log file directly.", [stream]);
+    throw new UserError("{0} path is unavailable. Slurm did not retain a log path for this job.", [stream]);
   }
   const replacements: Record<string, string | undefined> = {
-    j: fields.JobId ?? details.id,
-    A: fields.ArrayJobId,
-    a: fields.ArrayTaskId,
+    j: fields.JobId ?? fields.JobIDRaw ?? details.id,
+    A: fields.ArrayJobId ?? /^(\d+)_\d+/.exec(details.id)?.[1],
+    a: fields.ArrayTaskId ?? /^\d+_(\d+)/.exec(details.id)?.[1],
     x: fields.JobName,
     u: fields.UserId?.replace(/\(\d+\)$/, "") ?? fields.User,
     "%": "%"
