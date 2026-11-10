@@ -11,7 +11,7 @@
 1. 使用 **Remote - SSH** 连接 Slurm 登录节点。
 2. 按 `Ctrl+Shift+X` 打开扩展页，搜索 `@id:xx025.slurm-job-viewer`。
 3. 将 **Slurm Job Viewer** 安装到 **SSH 主机**；如果显示 **Install in SSH: ...**，点击该按钮。
-4. 点击活动栏的 **Slurm** 服务器图标，查看任务。默认使用远端当前系统用户。
+4. 点击活动栏的 **Slurm** 眼睛图标，查看任务。默认使用远端当前系统用户。
 
 需要 VS Code 1.90 或更新版本。远端必须能运行 `squeue`、`scontrol` 和 `sacct`。扩展直接使用现有 SSH 登录权限，无需额外的 HTTP 服务或令牌。
 

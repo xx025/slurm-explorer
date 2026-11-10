@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.5.2
+
+- Use an eye and prominent SLURM lettering for the Marketplace icon, with a matching eye icon in the activity bar.
+
 ## 0.5.1
 
 - Rewrite Chinese and English documentation with matching installation, update, history, native terminal log, settings and command guides.

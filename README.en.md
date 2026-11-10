@@ -11,7 +11,7 @@ View active Slurm jobs, accounting history and resource allocations in VS Code, 
 1. Connect to a Slurm login node using **Remote - SSH**.
 2. Press `Ctrl+Shift+X` and search for `@id:xx025.slurm-job-viewer`.
 3. Install **Slurm Job Viewer** on the **SSH host**. If you see **Install in SSH: ...**, select it.
-4. Open the **Slurm** server icon in the activity bar. The remote OS user is selected by default.
+4. Open the **Slurm** eye icon in the activity bar. The remote OS user is selected by default.
 
 Requires VS Code 1.90 or newer. The remote host must be able to run `squeue`, `scontrol` and `sacct`. The extension uses your existing SSH permissions; no additional HTTP service or token is needed.
 
