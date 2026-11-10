@@ -7,7 +7,7 @@
 ## 安装与连接
 
 1. 在 VS Code 安装 **Remote - SSH**，连接你的 Slurm 登录节点，例如 `node42`。
-2. 在远端窗口执行 **Extensions: Install from VSIX...**，选择 `slurm-job-viewer-0.3.0.vsix`。
+2. 在远端窗口执行 **Extensions: Install from VSIX...**，选择 `slurm-job-viewer-0.4.0.vsix`。
 3. 确认扩展安装在 **SSH 主机**上。如果扩展列表显示 **Install in SSH: ...**，点击该按钮。
 4. 点击左侧服务器图标 **Slurm**。默认展示远端当前系统用户的任务。
 
@@ -26,7 +26,7 @@
 - 按 ID 查找任务，支持数组任务 `123_4` 和异构任务组件 `123+1`。
 - 打开 stdout / stderr 的只读尾部预览，默认最多读取末尾 256 KiB。
 - 控制器返回空的 stderr 路径时，按照批处理任务默认行为打开合并后的 stdout 日志。
-- 可见任务列表和已打开日志默认每 30 秒刷新；详情页点击按钮刷新。
+- 可见任务列表默认每 30 秒刷新；输出面板每 2 秒跟踪新增日志；详情页点击按钮刷新。
 - 查询失败时保留已有任务并显示错误信息；同时提供查询输出通道。
 
 ## 常用命令
@@ -35,13 +35,13 @@
 
 | 命令 | 用途 |
 | --- | --- |
-| Refresh Jobs | 刷新任务列表和已打开日志 |
+| Refresh Jobs | 刷新任务列表与已展开的历史 |
 | Select User Scope / 选择用户范围 | 切换仅自己、所有用户或指定用户 |
 | Change Interface Language / 切换界面语言 | 跟随 VS Code、简体中文或 English |
 | Filter Jobs | 筛选当前任务；清空输入恢复全部 |
 | Show Job History | 定位、展开并刷新左侧“历史”分组 |
 | Find Job by ID | 查询指定任务 |
-| Open Standard Output / Error | 选择任务并打开日志 |
+| Follow Standard Output / Error | 在底部面板跟踪任务日志 |
 | Show Query Output | 查看查询命令和错误信息 |
 
 ## 设置
@@ -100,7 +100,7 @@
 ```bash
 npm ci
 npm test
-npm run package -- --out ../slurm-job-viewer-0.3.0.vsix
+npm run package -- --out ../slurm-job-viewer-0.4.0.vsix
 ```
 
 运行 `npm run compile` 后，在 VS Code 打开源码目录，按 F5 启动扩展开发窗口。使用 Remote-SSH 在登录节点打开源码目录，可以直接调试真实 Slurm 查询。
@@ -121,6 +121,12 @@ Marketplace Publisher ID 为 `xx025`，对应扩展 ID 为 `xx025.slurm-job-view
 | Workflow | `publish.yml` |
 | Environment | 留空 |
 
-工作流位于 `.github/workflows/publish.yml`。手动运行时，`publish=false` 只测试、打包并上传构建附件；`publish=true` 使用 OIDC 发布到市场。正式发布 GitHub Release 时也会触发市场发布，Release 标签必须与 `package.json` 的版本匹配，例如 `v0.3.0`。
+工作流位于 `.github/workflows/publish.yml`。手动运行时，`publish=false` 只测试、打包并上传构建附件；`publish=true` 使用 OIDC 发布到市场。正式发布 GitHub Release 时也会触发市场发布，Release 标签必须与 `package.json` 的版本匹配，例如 `v0.4.0`。
 
 English documentation is included as `README.en.md`.
+
+## 底部实时输出
+
+点击任务旁的输出图标，或在详情中点击“跟踪标准输出 / 标准错误”，会打开底部 **Slurm 输出** 面板。每 2 秒读取新增日志，支持切换 stdout / stderr、暂停 / 继续、清空显示、停止跟踪和自动滚动。打开另一个任务的输出即可切换跟踪目标。
+
+首次显示日志末尾（默认 256 KiB，由 `slurmJobs.logTailKB` 控制），后续增量读取；显示缓冲区有上限，支持文件截断和替换后继续读取。文件尚未生成或暂不可读时自动重试。只读取当前登录账号有权限访问的普通文件。程序自身的输出缓冲仍可能导致日志延迟写入；Python 任务可以使用 `python -u`。

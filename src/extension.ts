@@ -1,12 +1,11 @@
 import * as vscode from "vscode";
 import os from "node:os";
-import path from "node:path";
 import { randomBytes } from "node:crypto";
 import { Job, JobDetails, escapeHtml, groupFor, validateJobId } from "./model";
 import { Settings, SlurmClient } from "./slurm";
-import { logPath, readTail } from "./logs";
 import { createTranslator, errorMessage, resolveLanguage } from "./i18n";
 import { HistoryStore } from "./history";
+import { JobOutput } from "./output";
 
 type Group = { kind: "group"; label: string; jobs: Job[] };
 type JobNode = { kind: "job"; job: Job };
@@ -166,38 +165,6 @@ class JobTree implements vscode.TreeDataProvider<Node>, vscode.Disposable {
   dispose(): void { this.history.dispose(); this.emitter.dispose(); }
 }
 
-class LogProvider implements vscode.TextDocumentContentProvider, vscode.Disposable {
-  private readonly emitter = new vscode.EventEmitter<vscode.Uri>();
-  readonly onDidChange = this.emitter.event;
-  private readonly paths = new Map<string, string>();
-
-  uri(filename: string): vscode.Uri {
-    const uri = vscode.Uri.from({
-      scheme: "slurm-log", path: `/${path.basename(filename)}`, query: filename
-    });
-    this.paths.set(uri.toString(), filename);
-    return uri;
-  }
-
-  async provideTextDocumentContent(uri: vscode.Uri): Promise<string> {
-    const filename = this.paths.get(uri.toString());
-    if (!filename) { return t("Log preview expired. Reopen the log from the job details."); }
-    try {
-      const text = await readTail(filename, config().get<number>("logTailKB", 256) * 1024, t);
-      return `${t("File: {0}", filename)}\n${t("Updated: {0}", new Date().toLocaleString(locale()))}\n\n${text}`;
-    } catch (error) { return `${t("File: {0}", filename)}\n\n${message(error)}\n${t("The log may not exist yet or may not be accessible from this host.")}`; }
-  }
-
-  refresh(): void {
-    for (const document of vscode.workspace.textDocuments) {
-      if (document.uri.scheme === "slurm-log" && !document.isClosed) { this.emitter.fire(document.uri); }
-    }
-  }
-
-  forget(uri: vscode.Uri): void { this.paths.delete(uri.toString()); }
-  dispose(): void { this.paths.clear(); this.emitter.dispose(); }
-}
-
 function message(error: unknown): string { return errorMessage(error, t); }
 
 function renderDetails(details: JobDetails): string {
@@ -259,18 +226,16 @@ export function activate(context: vscode.ExtensionContext): void {
   const client = new SlurmClient(settings, text => output.appendLine(`[${new Date().toISOString()}] ${text}`));
   const tree = new JobTree(client);
   const view = vscode.window.createTreeView("slurmJobs", { treeDataProvider: tree, showCollapseAll: true });
-  const logs = new LogProvider();
+  const jobOutput = new JobOutput(t, message, () => config().get<number>("logTailKB", 256) * 1024);
   const panels = new Map<string, vscode.WebviewPanel>();
   const panelDetails = new Map<string, JobDetails>();
   let pendingRefresh: Promise<void> | undefined;
   let refreshAgain = false;
   let timer: NodeJS.Timeout | undefined;
   let disposed = false;
-  context.subscriptions.push(output, tree, view, logs,
-    vscode.workspace.registerTextDocumentContentProvider("slurm-log", logs),
-    vscode.workspace.onDidCloseTextDocument(document => {
-      if (document.uri.scheme === "slurm-log") { logs.forget(document.uri); }
-    })
+  let logRequest = 0;
+  context.subscriptions.push(output, tree, view, jobOutput,
+    vscode.window.registerWebviewViewProvider("slurmLogOutput", jobOutput),
   );
 
   async function refresh(force = false): Promise<void> {
@@ -317,10 +282,10 @@ export function activate(context: vscode.ExtensionContext): void {
   }
 
   async function openLog(id: string, stream: "StdOut" | "StdErr", known?: JobDetails): Promise<void> {
+    const request = ++logRequest;
     const details = known ?? await client.details(id);
-    const filename = logPath(details, stream);
-    const document = await vscode.workspace.openTextDocument(logs.uri(filename));
-    await vscode.window.showTextDocument(document, { preview: false });
+    if (disposed || request !== logRequest) { return; }
+    await jobOutput.follow(details, stream);
   }
 
   async function showDetails(id: string, known?: JobDetails): Promise<void> {
@@ -362,7 +327,6 @@ export function activate(context: vscode.ExtensionContext): void {
   }
 
   register("slurm.refresh", async () => {
-    logs.refresh();
     await Promise.all([refresh(), tree.refreshHistory(true)]);
   });
   register("slurm.output", () => output.show());
@@ -409,8 +373,14 @@ export function activate(context: vscode.ExtensionContext): void {
     if (id) { await showDetails(id, typeof input === "object" && input.kind === "historyJob" ? input.details : undefined); }
   });
   register("slurm.lookup", async () => { const id = await chooseId(); if (id) { await showDetails(id); } });
-  register("slurm.stdout", async input => { const id = await chooseId(input); if (id) { await openLog(id, "StdOut"); } });
-  register("slurm.stderr", async input => { const id = await chooseId(input); if (id) { await openLog(id, "StdErr"); } });
+  register("slurm.stdout", async input => {
+    const id = await chooseId(input);
+    if (id) { await openLog(id, "StdOut", typeof input === "object" && input.kind === "historyJob" ? input.details : undefined); }
+  });
+  register("slurm.stderr", async input => {
+    const id = await chooseId(input);
+    if (id) { await openLog(id, "StdErr", typeof input === "object" && input.kind === "historyJob" ? input.details : undefined); }
+  });
   register("slurm.copyId", async input => { const id = await chooseId(input); if (id) { await vscode.env.clipboard.writeText(id); } });
   register("slurm.history", async () => {
     tree.historyRequested = true;
@@ -429,7 +399,6 @@ export function activate(context: vscode.ExtensionContext): void {
           void refresh();
           if (Date.now() - tree.history.loadedAt >= 60000) { void tree.refreshHistory(true); }
         }
-        logs.refresh();
       }, seconds * 1000);
     }
   }
@@ -445,8 +414,8 @@ export function activate(context: vscode.ExtensionContext): void {
           tree.resetHistory();
         }
         if (event.affectsConfiguration("slurmJobs.language")) {
+          jobOutput.render();
           tree.update(tree.jobs);
-          logs.refresh();
           for (const [id, panel] of panels) {
             const details = panelDetails.get(id);
             if (details) { panel.webview.html = renderDetails(details); }

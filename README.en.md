@@ -7,7 +7,7 @@ Download the installable package from [GitHub Releases](https://github.com/xx025
 ## Installation
 
 1. Connect to a Slurm login node using **Remote - SSH**.
-2. Run **Extensions: Install from VSIX...** and select `slurm-job-viewer-0.3.0.vsix`.
+2. Run **Extensions: Install from VSIX...** and select `slurm-job-viewer-0.4.0.vsix`.
 3. Ensure the extension is installed on the SSH host.
 4. Open **Slurm** from the activity bar.
 
@@ -47,7 +47,7 @@ Open job details and log previews update when this setting changes. Native comma
 - Accounting history, including exit codes and start/end times.
 - Open historical details directly from the sidebar. The history toolbar action expands and refreshes this group instead of opening a picker.
 - Read-only stdout and stderr previews, bounded to the file tail.
-- Automatic refresh of the visible queue and open logs.
+- Automatic queue refresh and independent live log following in the bottom panel.
 
 ## Settings
 
@@ -84,7 +84,7 @@ Use Node.js 22 or newer:
 ```bash
 npm ci
 npm test
-npm run package -- --out ../slurm-job-viewer-0.3.0.vsix
+npm run package -- --out ../slurm-job-viewer-0.4.0.vsix
 ```
 
 Open the source directory in VS Code and press F5 to launch the extension development host. For a read-only live backend check on a Slurm login node, compile first and run `node test/live-check.cjs`.
@@ -103,4 +103,10 @@ Create a GitHub Actions Trusted Publishing policy with:
 | Workflow | `publish.yml` |
 | Environment | Leave empty |
 
-The workflow is `.github/workflows/publish.yml`. Manual runs with `publish=false` only test, package and upload the build artifact. Set `publish=true` to publish with OIDC. Publishing a GitHub Release also triggers Marketplace publishing; its tag must match the package version, such as `v0.3.0`.
+The workflow is `.github/workflows/publish.yml`. Manual runs with `publish=false` only test, package and upload the build artifact. Set `publish=true` to publish with OIDC. Publishing a GitHub Release also triggers Marketplace publishing; its tag must match the package version, such as `v0.4.0`.
+
+## Live output in the bottom panel
+
+Use a job's output icon or the stdout / stderr buttons in its details to open the bottom **Slurm Output** panel. New log content is read every 2 seconds. Switch streams, pause / resume, clear the display, stop following, or toggle auto-scroll. Open another job's output to switch the followed job.
+
+The initial tail defaults to 256 KiB (`slurmJobs.logTailKB`); subsequent reads are incremental and the display buffer is bounded. File truncation and replacement are detected. Missing or temporarily unreadable files are retried automatically. Only regular files accessible to the logged-in user can be read. Application buffering can still delay log writes; use `python -u` for unbuffered Python output.

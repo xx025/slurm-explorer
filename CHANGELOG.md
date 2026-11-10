@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.4.0
+
+- Follow stdout / stderr in a dedicated bottom Slurm Output panel, updating every 2 seconds.
+- Add pause / resume, stream selection, clear, stop, and auto-scroll controls in English and Chinese.
+- Read bounded increments, handle UTF-8 boundaries, truncation and rotation, and retry unavailable logs.
+
 ## 0.3.0
 
 - Moved job history into an expandable group in the left sidebar.

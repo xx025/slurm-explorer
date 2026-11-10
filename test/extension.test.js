@@ -62,6 +62,7 @@ function harness(initialGate) {
       }
     },
     window: {
+      registerWebviewViewProvider: (_id, provider) => { state.outputProvider = provider; return disposable(); },
       createOutputChannel: () => ({ ...disposable(), appendLine() {}, show() {} }),
       createTreeView: (_id, options) => {
         state.tree = options.treeDataProvider;
@@ -107,7 +108,8 @@ function harness(initialGate) {
       return jobs.filter(job => user === "*" || job.user === user);
     }
     async details(id) {
-      return { id, source: "scontrol", fields: { JobId: id, JobName: "<script>test</script>", JobState: "RUNNING" }, raw: "JobId=" + id };
+      if (state.detailsHandler) { return state.detailsHandler(id); }
+      return { id, source: "scontrol", fields: { JobId: id, JobName: "<script>test</script>", JobState: "RUNNING", ...(state.logFile ? {StdOut: state.logFile, StdErr: ""} : {}) }, raw: "JobId=" + id };
     }
     async history() {
       const user = this.readSettings().user;
@@ -118,7 +120,10 @@ function harness(initialGate) {
   }
   const filename = path.join(__dirname, "../dist/extension.js");
   const realRequire = createRequire(filename);
-  const injectedRequire = name => name === "vscode" ? api : name === "./slurm" ? { SlurmClient } : realRequire(name);
+  const outputModule = { exports: {} };
+  new Function("require", "module", "exports", fs.readFileSync(path.join(__dirname, "../dist/output.js"), "utf8"))(
+    name => name === "vscode" ? api : realRequire(name), outputModule, outputModule.exports);
+  const injectedRequire = name => name === "vscode" ? api : name === "./slurm" ? { SlurmClient } : name === "./output" ? outputModule.exports : realRequire(name);
   const module = { exports: {} };
   new Function("require", "module", "exports", fs.readFileSync(filename, "utf8"))(injectedRequire, module, module.exports);
   const context = { subscriptions: [] };
@@ -163,6 +168,86 @@ test("extension user selection and language commands update real providers and o
     assert.match(app.panels[0].webview.html, /Refresh details/);
     assert.deepEqual(app.errors, []);
   } finally { app.dispose(); }
+});
+
+test("late reads and controller lookups cannot overwrite a newly selected job", async () => {
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), "slurm-switch-"));
+  const first = path.join(directory, "first.log");
+  const second = path.join(directory, "second.log");
+  fs.writeFileSync(first, "first\n");
+  fs.writeFileSync(second, "second\n");
+  const app = harness();
+  const messages = [];
+  app.outputProvider.resolveWebviewView({
+    webview: { html:"", postMessage:async data=>messages.push(data), onDidReceiveMessage:()=>disposable() },
+    onDidDispose:()=>disposable()
+  });
+  try {
+    app.logFile = first;
+    await app.run("slurm.stdout", "42");
+    let releaseRead;
+    app.outputProvider.cursor.read = () => new Promise(resolve => { releaseRead = resolve; });
+    const pendingRead = app.outputProvider.poll();
+    app.logFile = second;
+    await app.run("slurm.stdout", "43");
+    releaseRead({text:"late first\n",reset:false,skipped:false});
+    await pendingRead;
+    assert.equal(messages.at(-1).text, "second\n");
+    assert.equal(messages.at(-1).title, "Job 43");
+    let releaseLookup;
+    app.detailsHandler = id => id === "42" ? new Promise(resolve => {releaseLookup=resolve;})
+      : Promise.resolve({id,source:"scontrol",fields:{StdOut:second},raw:""});
+    const pendingLookup = app.run("slurm.stdout", "42");
+    await settle();
+    await app.run("slurm.stdout", "43");
+    releaseLookup({id:"42",source:"scontrol",fields:{StdOut:first},raw:""});
+    await pendingLookup;
+    assert.equal(messages.at(-1).title, "Job 43");
+    assert.equal(messages.at(-1).text, "second\n");
+  } finally { app.dispose(); fs.rmSync(directory,{recursive:true}); }
+});
+
+test("opening stdout focuses the bottom view and follows incremental content", async () => {
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), "slurm-output-"));
+  const filename = path.join(directory, "job.log");
+  fs.writeFileSync(filename, "epoch 1\n");
+  const app = harness();
+  const messages = [];
+  let receive;
+  const view = {
+    webview: {
+      html: "", postMessage: async data => { messages.push(data); },
+      onDidReceiveMessage: handler => { receive = handler; return disposable(); }
+    },
+    onDidDispose: () => disposable()
+  };
+  try {
+    app.logFile = filename;
+    app.outputProvider.resolveWebviewView(view);
+    await app.run("slurm.stdout", "42");
+    assert.ok(app.executed.some(([command]) => command === "slurmLogOutput.focus"));
+    assert.equal(messages.at(-1).text, "epoch 1\n");
+    await receive({action:"pause"});
+    fs.appendFileSync(filename, "epoch 2\n");
+    await app.outputProvider.poll();
+    assert.equal(messages.at(-1).text, "epoch 1\n");
+    await receive({action:"pause"});
+    assert.equal(messages.at(-1).text, "epoch 1\nepoch 2\n");
+    await receive({action:"clear"});
+    fs.appendFileSync(filename, "epoch 3\n");
+    await app.outputProvider.poll();
+    assert.equal(messages.at(-1).text, "epoch 3\n");
+    await receive({action:"stream",stream:"StdErr"});
+    assert.equal(messages.at(-1).stream, "StdErr");
+    assert.equal(messages.at(-1).text, "epoch 1\nepoch 2\nepoch 3\n");
+    app.selections.push("zh-cn");
+    await app.run("slurm.language");
+    assert.match(view.webview.html, /自动滚动/);
+    await receive({action:"stop"});
+    await receive({action:"ready"});
+    assert.equal(messages.at(-1).active, false);
+    assert.deepEqual(app.errors, []);
+  } finally { app.dispose(); fs.rmSync(directory, {recursive:true}); }
 });
 
 test("a pending own-user query cannot replace results after switching to all users", async () => {

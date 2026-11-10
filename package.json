@@ -2,7 +2,7 @@
   "name": "slurm-job-viewer",
   "displayName": "Slurm Job Viewer",
   "description": "%extension.description%",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "publisher": "xx025",
   "license": "MIT",
   "engines": {
@@ -22,7 +22,8 @@
   ],
   "main": "./dist/extension.js",
   "activationEvents": [
-    "onView:slurmJobs"
+    "onView:slurmJobs",
+    "onView:slurmLogOutput"
   ],
   "capabilities": {
     "untrustedWorkspaces": {
@@ -92,6 +93,13 @@
           "title": "Slurm",
           "icon": "media/slurm.svg"
         }
+      ],
+      "panel": [
+        {
+          "id": "slurmOutput",
+          "title": "%panel.output%",
+          "icon": "media/slurm.svg"
+        }
       ]
     },
     "views": {
@@ -99,6 +107,13 @@
         {
           "id": "slurmJobs",
           "name": "%view.jobs%"
+        }
+      ],
+      "slurmOutput": [
+        {
+          "type": "webview",
+          "id": "slurmLogOutput",
+          "name": "%panel.output%"
         }
       ]
     },
