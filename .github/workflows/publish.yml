@@ -57,4 +57,4 @@ jobs:
           if-no-files-found: error
       - name: Publish with trusted identity
         if: github.event_name == 'release' || inputs.publish
-        run: npx --no-install vsce publish --packagePath slurm-job-viewer.vsix --oidc
+        run: npx --no-install vsce publish --packagePath slurm-job-viewer.vsix --oidc --skip-duplicate
