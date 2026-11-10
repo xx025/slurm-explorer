@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.6.1
+
+- Show allocated / total GPU counts in node rows, tooltips and details, with TRES and GRES fallback parsing.
+- Preserve unknown GPU metadata, handle mixed models and device indices, and avoid counting aggregate and typed TRES twice.
+- Simplify the Slurm icon to nine outline nodes, removing the small lettering and peripheral blocks.
+
 ## 0.6.0
 
 - Rename the project and extension display name to Slurm Explorer, keeping the extension ID xx025.slurm-job-viewer for existing users.

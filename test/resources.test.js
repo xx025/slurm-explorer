@@ -38,6 +38,6 @@ test("cluster queries use the configured executable and timeout without a job us
   assert.equal((await client.resources("node"))[0].name, "gpu01");
   assert.deepEqual(calls, [
     { command: "/opt/slurm/bin/scontrol", args: ["show", "partition", "--oneliner"], timeout: 13000 },
-    { command: "/opt/slurm/bin/scontrol", args: ["show", "node", "--oneliner"], timeout: 13000 }
+    { command: "/opt/slurm/bin/scontrol", args: ["show", "node", "--oneliner", "--details"], timeout: 13000 }
   ]);
 });

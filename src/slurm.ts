@@ -60,7 +60,9 @@ export class SlurmClient {
   }
 
   async resources(kind: ResourceKind): Promise<ClusterResource[]> {
-    return parseResources(await this.run("scontrol", ["show", kind, "--oneliner"]), kind);
+    const args = ["show", kind, "--oneliner"];
+    if (kind === "node") { args.push("--details"); }
+    return parseResources(await this.run("scontrol", args), kind);
   }
 
   async history(id?: string): Promise<JobDetails[]> {

@@ -40,9 +40,11 @@ Slurm privacy settings and filesystem permissions still apply when viewing other
 The Slurm sidebar uses three independent native VS Code views: **Jobs, Partitions and Nodes**. Select a view header to collapse or expand it; drag to reorder, resize it, or hide it through the view menu. Partitions and Nodes start collapsed and load when expanded.
 
 - **Partitions:** state, node count and total CPUs; the default partition has a `*` suffix. Open a partition for time limits, node ranges, allowed accounts / groups and all controller fields.
-- **Nodes:** state, allocated / total CPUs and partition membership. Open a node for configured / allocated / free memory, CPU load, GPU/GRES, configured and allocated resources, and maintenance reasons when available.
+- **Nodes:** state, allocated / total CPUs, allocated / total GPUs and partition membership (`GPU 2/4` means 2 allocated out of 4 total). Open a node for configured / allocated / free memory, CPU load, GPU/GRES, configured and allocated resources, and maintenance reasons when available.
 - Each view has its own **↻** button. Visible views refresh using `slurmJobs.refreshSeconds`; set it to `0` to disable automatic refresh. **Refresh details** queries the controller again.
-- Resource views use `scontrol show partition/node --oneliner`, independently of the job user scope and text filter. Failed queries retain previous results and offer click-to-retry. Cluster permissions determine visibility and available fields.
+- Resource views use `scontrol show partition/node --oneliner` (with `--details` for nodes), independently of the job user scope and text filter. Failed queries retain previous results and offer click-to-retry. Cluster permissions determine visibility and available fields.
+
+GPU counts prefer `CfgTRES` / `AllocTRES`, with `Gres` / `GresUsed` fallbacks. Unknown values display as `—`; CPU-only nodes show `0/0`. Counts follow Slurm configuration and allocations, including configured MIG instances, rather than live utilization.
 
 ## Sidebar history
 

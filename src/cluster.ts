@@ -3,6 +3,7 @@ import { randomBytes } from "node:crypto";
 import { ClusterResource, ResourceKind, escapeHtml } from "./model";
 import { Translator } from "./i18n";
 import { SlurmClient } from "./slurm";
+import { gpuCounts } from "./gpu";
 
 type Status = { status: "loading" | "error" | "empty" };
 type ResourceNode = ClusterResource | Status;
@@ -59,6 +60,7 @@ export class ResourceTree implements vscode.TreeDataProvider<ResourceNode>, vsco
       return item;
     }
     const f = element.fields;
+    const gpu = gpuCounts(f);
     const item = new vscode.TreeItem(element.name + (f.Default === "YES" ? " *" : ""));
     item.id = `${this.kind}:${element.name}`;
     item.contextValue = `slurm${this.kind}`;
@@ -66,8 +68,15 @@ export class ResourceTree implements vscode.TreeDataProvider<ResourceNode>, vsco
       : this.kind === "partition" ? "server-environment" : "server");
     item.description = this.kind === "partition"
       ? this.t("{0} · {1} nodes · {2} CPUs", f.State ?? "—", f.TotalNodes ?? "—", f.TotalCPUs ?? "—")
-      : this.t("{0} · CPU {1}/{2} · {3}", f.State ?? "—", f.CPUAlloc ?? "—", f.CPUTot ?? "—", f.Partitions ?? "—");
-    item.tooltip = Object.entries(f).map(([key, value]) => `${key}: ${value}`).join("\n");
+      : this.t("{0} · CPU {1}/{2} · GPU {3}/{4} · {5}", f.State ?? "—", f.CPUAlloc ?? "—",
+        f.CPUTot ?? "—", gpu.allocated ?? "—", gpu.total ?? "—", f.Partitions ?? "—");
+    item.tooltip = [
+      ...(this.kind === "node" ? [
+        this.t("GPUs (total): {0}", gpu.total ?? "—"),
+        this.t("GPUs (allocated): {0}", gpu.allocated ?? "—")
+      ] : []),
+      ...Object.entries(f).map(([key, value]) => `${key}: ${value}`)
+    ].join("\n");
     item.command = { command: "slurm.resourceDetails", title: this.t("Resource details"), arguments: [element] };
     return item;
   }
@@ -123,6 +132,11 @@ export function renderResource(resource: ClusterResource, t: Translator, languag
   const escape = escapeHtml;
   const nonce = randomBytes(18).toString("base64");
   const f = resource.fields;
+  const gpu = gpuCounts(f);
+  const gpuRows = resource.kind === "node" ? [
+    `<tr><th>${escape(t("GPUs (total)"))}</th><td>${gpu.total ?? "—"}</td></tr>`,
+    `<tr><th>${escape(t("GPUs (allocated)"))}</th><td>${gpu.allocated ?? "—"}</td></tr>`
+  ].join("") : "";
   const summary: [string, string[]][] = resource.kind === "partition" ? [
     ["State", ["State"]], ["Default partition", ["Default"]], ["Nodes", ["TotalNodes"]],
     ["CPUs", ["TotalCPUs"]], ["Time limit", ["MaxTime"]], ["Node list", ["Nodes"]],
@@ -151,7 +165,7 @@ th{width:30%;color:var(--vscode-descriptionForeground)}button{color:var(--vscode
 pre{white-space:pre-wrap;overflow-wrap:anywhere}.meta{color:var(--vscode-descriptionForeground)}
 </style></head><body><h1>${escape(resource.name)}</h1>
 <p class="meta">${escape(resource.kind === "partition" ? t("Partition") : t("Cluster node"))}</p>
-<button id="refresh">${escape(t("Refresh details"))}</button><table>${rows}</table>
+<button id="refresh">${escape(t("Refresh details"))}</button><table>${gpuRows}${rows}</table>
 <details><summary>${escape(t("All fields"))}</summary><table>${all}</table></details>
 <details><summary>${escape(t("Raw {0} output", "scontrol"))}</summary><pre>${escape(resource.raw)}</pre></details>
 <script nonce="${nonce}">const api=acquireVsCodeApi();document.getElementById('refresh').addEventListener('click',()=>api.postMessage({action:'refresh'}));</script>

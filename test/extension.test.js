@@ -137,7 +137,7 @@ function harness(initialGate) {
       if (state.resourceHandler) { return state.resourceHandler(kind); }
       return kind === "partition"
         ? [{ kind, name: "gpu", fields: { PartitionName: "gpu", State: "UP", TotalNodes: "2", TotalCPUs: "128", Default: "YES", Nodes: "gpu[01-02]" }, raw: "PartitionName=gpu State=UP" }]
-        : [{ kind, name: "gpu01", fields: { NodeName: "gpu01", State: "MIXED", CPUAlloc: "16", CPUTot: "64", Partitions: "gpu", Gres: "gpu:a100:4", RealMemory: "256000" }, raw: "NodeName=gpu01 State=MIXED" }];
+        : [{ kind, name: "gpu01", fields: { NodeName: "gpu01", State: "MIXED", CPUAlloc: "16", CPUTot: "64", Partitions: "gpu", Gres: "gpu:a100:4", CfgTRES: "cpu=64,gres/gpu=4,gres/gpu:a100=4", AllocTRES: "cpu=16,gres/gpu=2,gres/gpu:a100=2", RealMemory: "256000" }, raw: "NodeName=gpu01 State=MIXED" }];
     }
   }
   const filename = path.join(__dirname, "../dist/extension.js");
@@ -270,11 +270,14 @@ test("partition and node views show independent resources and refresh localized 
     assert.equal(partitions.tree.getTreeItem(partition).label, "gpu *");
     assert.match(partitions.tree.getTreeItem(partition).description, /2 nodes · 128 CPUs/);
     const node = nodes.tree.getChildren()[0];
-    assert.match(nodes.tree.getTreeItem(node).description, /CPU 16\/64 · gpu/);
+    assert.match(nodes.tree.getTreeItem(node).description, /CPU 16\/64 · GPU 2\/4 · gpu/);
+    assert.match(nodes.tree.getTreeItem(node).tooltip, /GPUs \(total\): 4/);
     await app.run("slurm.resourceDetails", node);
     const panel = app.panels[0];
     assert.match(panel.webview.html, /gpu:a100:4/);
     assert.match(panel.webview.html, /Configured memory/);
+    assert.match(panel.webview.html, /GPUs \(total\)<\/th><td>4<\/td>/);
+    assert.match(panel.webview.html, /GPUs \(allocated\)<\/th><td>2<\/td>/);
     await app.run("slurm.resourceDetails", node);
     assert.equal(app.panels.length, 1);
     app.resourceHandler = async kind => kind === "node"
@@ -290,6 +293,7 @@ test("partition and node views show independent resources and refresh localized 
     assert.equal(partitions.view.title, "分区");
     assert.equal(nodes.view.title, "节点");
     assert.match(panel.webview.html, /已分配 CPU/);
+    assert.match(panel.webview.html, /GPU 总数<\/th><td>4<\/td>/);
     app.selections.push("*");
     await app.run("slurm.selectUser");
     assert.equal(partitions.tree.records[0].name, "gpu");
