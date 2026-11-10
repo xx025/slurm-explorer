@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.5.1
+
+- Rewrite Chinese and English documentation with matching installation, update, history, native terminal log, settings and command guides.
+- Add a Marketplace and extension-list icon with prominent SLURM lettering and connected cluster nodes.
+
 ## 0.5.0
 
 - Follow each job / stream in a native VS Code terminal tab; retain independent followers and reuse existing tabs.

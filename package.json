@@ -2,7 +2,7 @@
   "name": "slurm-job-viewer",
   "displayName": "Slurm Job Viewer",
   "description": "%extension.description%",
-  "version": "0.5.0",
+  "version": "0.5.1",
   "publisher": "xx025",
   "license": "MIT",
   "engines": {
@@ -256,5 +256,6 @@
   "homepage": "https://github.com/xx025/slurm-job-viewer#readme",
   "bugs": {
     "url": "https://github.com/xx025/slurm-job-viewer/issues"
-  }
+  },
+  "icon": "media/icon.png"
 }

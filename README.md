@@ -1,50 +1,85 @@
 # Slurm Job Viewer
 
-在 VS Code 侧边栏查看 Slurm 任务、详情、历史记录和日志。适用于通过 Remote-SSH 连接 Slurm 登录节点的工作方式，也可以在安装了 Slurm 客户端的 Linux 本机运行。
+[English](README.en.md) · [VS Code 扩展市场](https://marketplace.visualstudio.com/items?itemName=xx025.slurm-job-viewer)
 
-安装包请从 [GitHub Releases](https://github.com/xx025/slurm-job-viewer/releases/latest) 下载。
+在 VS Code 中查看 Slurm 当前任务、历史记录和资源分配，并在**原生终端标签**中持续跟踪日志。支持简体中文和英文，适用于通过 Remote-SSH 连接 Slurm 登录节点，也可在已安装 Slurm 客户端的 Linux 本机运行。
 
-## 安装与连接
+## 安装与更新
 
-1. 在 VS Code 安装 **Remote - SSH**，连接你的 Slurm 登录节点，例如 `node42`。
-2. 在远端窗口执行 **Extensions: Install from VSIX...**，选择 `slurm-job-viewer-0.5.0.vsix`。
-3. 确认扩展安装在 **SSH 主机**上。如果扩展列表显示 **Install in SSH: ...**，点击该按钮。
-4. 点击左侧服务器图标 **Slurm**。默认展示远端当前系统用户的任务。
+### 从扩展市场安装
 
-扩展在远端执行 `squeue`、`scontrol`、`sacct`，不需要配置额外的 HTTP 服务或令牌。SSH 登录、跳板机和认证由 Remote-SSH 管理。请确认在远端终端中这些命令可以正常执行。
+1. 使用 **Remote - SSH** 连接 Slurm 登录节点。
+2. 按 `Ctrl+Shift+X` 打开扩展页，搜索 `@id:xx025.slurm-job-viewer`。
+3. 将 **Slurm Job Viewer** 安装到 **SSH 主机**；如果显示 **Install in SSH: ...**，点击该按钮。
+4. 点击活动栏的 **Slurm** 服务器图标，查看任务。默认使用远端当前系统用户。
 
-## 功能
+需要 VS Code 1.90 或更新版本。远端必须能运行 `squeue`、`scontrol` 和 `sacct`。扩展直接使用现有 SSH 登录权限，无需额外的 HTTP 服务或令牌。
 
-- 支持中文和英文，默认跟随 VS Code 显示语言。
-- 工具栏提供“选择用户范围”，可以切换仅自己、所有用户、指定用户；任务列表和历史记录共用所选范围。
-- 任务按 Running / Pending / Other 分组。
-- 任务树底部固定显示“历史”分组，展开后查看已完成、失败、取消、超时等已结束任务，按结束时间从新到旧排列。
-- 显示任务 ID、名称、用户、状态、分区、运行时长、时间限制、CPU、请求内存、GRES 和排队原因。
-- 点击任务打开详情，包含申请/分配资源、节点、退出码、工作目录、启动命令和日志路径。
-- 工具栏筛选任务，支持任务 ID、名称、状态、用户、分区和排队原因。
-- 点击左侧历史任务直接打开详情；顶部历史按钮会定位并展开该分组。默认查询最近七天，可以在设置中修改时间窗口。
-- 按 ID 查找任务，支持数组任务 `123_4` 和异构任务组件 `123+1`。
-- 在原生终端标签里跟踪 stdout / stderr，首次默认读取末尾 256 KiB。
-- 控制器返回空的 stderr 路径时，按照批处理任务默认行为打开合并后的 stdout 日志。
-- 可见任务列表默认每 30 秒刷新；各日志终端每 2 秒跟踪新增日志；详情页点击按钮刷新。
-- 查询失败时保留已有任务并显示错误信息；同时提供查询输出通道。
+### 更新已有扩展
 
-## 常用命令
+在 Remote-SSH 窗口的扩展页点击 **… → Check for Extension Updates（检查扩展更新）**，更新安装在 SSH 主机上的扩展。更新后执行 **Developer: Reload Window（开发人员：重新加载窗口）**。
 
-在命令面板搜索 `Slurm:`：
+如果更新尚未显示，也可以从 [GitHub Releases](https://github.com/xx025/slurm-job-viewer/releases/latest) 下载 `.vsix`，在远端窗口执行 **Extensions: Install from VSIX...** 安装。访问私有仓库的发布附件需要相应 GitHub 权限。
 
-| 命令 | 用途 |
-| --- | --- |
-| Refresh Jobs | 刷新任务列表与已展开的历史 |
-| Select User Scope / 选择用户范围 | 切换仅自己、所有用户或指定用户 |
-| Change Interface Language / 切换界面语言 | 跟随 VS Code、简体中文或 English |
-| Filter Jobs | 筛选当前任务；清空输入恢复全部 |
-| Show Job History | 定位、展开并刷新左侧“历史”分组 |
-| Find Job by ID | 查询指定任务 |
-| Follow Standard Output / Error | 在原生终端标签里跟踪任务日志 |
-| Show Query Output | 查看查询命令和错误信息 |
+任务视图的 **↻** 只刷新任务数据，不检查扩展版本更新。
 
-## 设置
+## 当前任务与用户范围
+
+- 当前任务按**运行中、排队中、其他**分组，显示 ID、名称、用户、状态、分区、运行时长和排队原因。
+- 点击任务打开详情，查看 CPU、请求内存、GRES、申请 / 分配资源、节点、时间限制、退出码、工作目录和日志路径等可用字段。
+- 点击用户图标，选择**仅自己、所有用户、指定用户**。当前任务和历史记录使用相同的用户范围。
+- 点击筛选图标，按 ID、名称、用户、状态、分区等字段匹配；清空输入可恢复全部结果。
+- 使用搜索图标按 ID 查找任务，支持数组任务 `123_4` 和异构任务组件 `123+1`。
+
+任务列表默认每 30 秒自动刷新，也可点击 **↻** 手动刷新。查询失败时保留已有结果并显示错误；**Show Query Output** 可查看查询命令和诊断。
+
+查看其他用户的任务与日志仍受 Slurm 隐私设置和文件权限约束。
+
+## 左侧历史记录
+
+任务树底部固定显示可展开的**历史**分组。首次展开时加载最近 7 天已完成、失败、取消、超时等已结束任务，并按结束时间从新到旧排列。点击历史任务即可打开详情。
+
+- 顶部历史按钮会定位、展开并刷新该分组。
+- **↻** 同时刷新当前任务和已请求过的历史记录；加载失败时，可点击分组内的提示重试。
+- 自动刷新启用、任务视图可见时，已请求过的历史最多每分钟自动刷新一次。
+- 用户范围和文字筛选同时作用于当前任务和历史；`slurmJobs.historyDays` 控制查询窗口。
+
+历史来自 `sacct` 的任务分配记录。集群未启用记账、权限不足或记录已清理时，结果可能为空或显示查询错误。
+
+## 原生终端多标签日志
+
+点击任务旁的输出图标，或在详情页点击**跟踪标准输出 / 标准错误**，会在底部 **终端** 中打开原生标签：
+
+```text
+Slurm 14115 · stdout
+Slurm 14091 · stdout
+Slurm 14091 · stderr
+```
+
+不同任务、不同输出类型分别保留标签并独立跟踪；重复打开同一输出会回到已有标签。使用 VS Code 原生终端标签列表切换、重命名和关闭，关闭标签只停止该日志跟踪，不会终止 Slurm 任务。若没有看到标签列表，可在设置中启用 **Terminal › Integrated › Tabs: Enabled**。
+
+- **跟踪频率**：每 2 秒读取新增日志，不受任务列表刷新间隔影响。
+- **首次读取**：默认读取文件末尾 256 KiB，之后增量读取；`slurmJobs.logTailKB` 控制单次读取上限。
+- **换行和进度条**：保留 ANSI 和 `\r` 回车刷新，将普通 LF 转换为终端 CRLF，避免阶梯状换行。
+- **原生交互**：支持终端的选择、复制、查找、滚动和折行。显示保留行数由 `terminal.integrated.scrollback` 控制。
+- **暂停与继续**：选中日志终端，从命令面板执行 **Pause Current Output / Resume Current Output**；各标签独立暂停。
+- **清空显示**：执行 **Clear Current Output**，不会修改日志文件；后续继续追加新输出。
+
+日志终端通过扩展直接读取文件，不启动 Shell，也不接受输入执行命令。文件截断或替换后会重新读取；路径已知但文件尚未生成或暂不可读时自动重试。
+
+### 历史任务日志
+
+打开历史任务的输出时，扩展会按需查询 Slurm 记账中保存的 `StdOut` / `StdErr`、`WorkDir` 和 `JobIDRaw` 等字段，解析日志路径，并支持数组任务文件名。
+
+**路径缺失时仅提示，跳过日志跟踪，不弹出文件选择框。** 路径存在时，文件仍须保留在远端主机可访问的位置，并允许当前 SSH 用户读取。旧版本 Slurm 未提供日志路径字段时，历史列表和详情仍可正常使用。
+
+控制器明确返回空的 stderr 路径时，使用合并后的 stdout。支持 `%j`、`%A`、`%a`、`%x`、`%u` 和数字补零；需要节点或任务上下文的模板（如 `%N`、`%t`）可能无法解析。
+
+## 中英文与设置
+
+在任务视图的更多操作菜单或命令面板运行 **Slurm: Change Interface Language**，选择跟随 VS Code、简体中文或英文。默认中文编辑器使用简体中文，其他语言使用英文。
+
+手动语言设置作用于任务树、详情和扩展提示；原生命令、菜单、设置与终端交互界面使用 VS Code 的显示语言。Slurm 字段、状态码、任务数据和日志正文保持原文。
 
 建议在 **Remote Settings** 中配置：
 
@@ -60,77 +95,57 @@
 }
 ```
 
-| 设置 | 说明 |
+| 设置 | 默认值 | 说明 |
+| --- | --- | --- |
+| `slurmJobs.language` | `auto` | `auto` 跟随 VS Code；`zh-cn` 简体中文；`en` 英文 |
+| `slurmJobs.user` | 空字符串 | 使用远端系统用户；`*` 查询所有用户；也可指定用户名 |
+| `slurmJobs.binDirectory` | 空字符串 | Slurm 命令所在绝对目录；留空使用扩展进程的 PATH |
+| `slurmJobs.refreshSeconds` | `30` | 任务列表刷新间隔，0–3600 秒；`0` 关闭任务和历史自动刷新，不影响日志跟踪 |
+| `slurmJobs.timeoutSeconds` | `20` | 单条 Slurm 查询超时，2–120 秒 |
+| `slurmJobs.historyDays` | `7` | 历史及记账查找窗口，1–365 天 |
+| `slurmJobs.logTailKB` | `256` | 单次日志读取上限，4–4096 KiB；显示保留行数使用原生终端设置 |
+
+## 命令速查
+
+按 `Ctrl+Shift+P` 搜索 `Slurm`。下表使用英文命令名；中文界面会显示对应译名。
+
+| 命令 | 用途 |
 | --- | --- |
-| `language` | `auto` 跟随 VS Code；`zh-cn` 简体中文；`en` 英文 |
-| `user` | 空字符串使用远端系统用户；`*` 查询所有用户；也可指定 Slurm 用户名 |
-| `binDirectory` | Slurm 命令所在绝对目录，例如 `/opt/slurm/bin`；留空使用扩展进程的 PATH |
-| `refreshSeconds` | 刷新间隔；设为 `0` 关闭自动刷新 |
-| `timeoutSeconds` | 每条 Slurm 命令的最大等待时间 |
-| `historyDays` | 历史记录和已离开控制器任务的查找窗口 |
-| `logTailKB` | 日志每次读取上限，范围 4–4096 KiB |
+| Refresh Jobs | 刷新当前任务与已请求的历史 |
+| Select User Scope | 选择仅自己、所有用户或指定用户 |
+| Change Interface Language | 切换扩展界面语言 |
+| Filter Jobs | 筛选当前任务和历史记录 |
+| Show Job History | 定位、展开并刷新历史分组 |
+| Find Job by ID | 按 ID 查询任务 |
+| Show Job Details | 查看任务详情 |
+| Follow Standard Output | 在原生终端标签中跟踪 stdout |
+| Follow Standard Error | 在原生终端标签中跟踪 stderr |
+| Pause Current Output | 暂停当前选中的日志终端 |
+| Resume Current Output | 继续当前选中的日志终端 |
+| Clear Current Output | 清空当前日志终端显示 |
+| Copy Job ID | 复制任务 ID |
+| Show Query Output | 查看查询命令和诊断 |
 
-## 查看其他用户和切换语言
+## 常见问题与限制
 
-点击任务栏顶部的用户图标，选择 **所有用户**，即可查看当前账号有权看到的各用户任务；也可以选择 **指定用户** 输入用户名。任务行和历史列表会显示所属用户。
+- **找不到 Slurm 命令**：扩展不会加载交互式 Shell 初始化文件。若 Slurm 需 `module load`，请设置 `binDirectory`，并确保扩展进程具有所需环境和库路径。
+- **任务可见但日志不可读**：任务查询权限与文件读取权限分别生效。仅位于计算节点本地磁盘的日志，无法从登录节点直接跟踪。
+- **日志更新慢**：扩展只能读取程序已写入文件的内容。Python 任务可使用 `python -u` 减少输出缓冲造成的延迟。
+- **资源使用率**：CPU、GPU、内存等字段表示申请或分配情况；当前不提供实时 GPU 利用率、显存曲线或 step 级实际内存峰值汇总。
+- 当前查询默认集群，不提供联合集群切换；扩展仅在受信任工作区启用。
 
-左侧“历史”首次展开时加载数据，之后可点击刷新按钮重新查询；历史加载失败时，可点击分组内的提示重试。已展开过历史且任务视图可见时，历史查询最多每分钟自动刷新一次。顶部文字筛选同时作用于当前任务和历史记录。
-
-通过视图右上角的更多操作菜单，或命令面板的 **Slurm: 切换界面语言 / Change Interface Language**，选择跟随 VS Code、简体中文或英文。切换后，已打开的详情页也会更新。原生命令、菜单和设置名称使用 VS Code 的显示语言；手动语言设置影响任务树、详情、提示和日志预览。Slurm 返回的任务状态码、字段原名、排队原因和日志正文保留原文。
-
-查看其他人的任务和日志仍使用当前 SSH 登录账号的权限。集群启用了 `PrivateData` 等访问限制，或日志文件没有读取权限时，插件会显示查询结果或权限错误，不会提升权限。
-
-## 数据和使用限制
-
-- 任务列表来自 `squeue`，详情优先来自 `scontrol show job`。任务离开控制器后，按 ID 查找会回退到 `sacct`。
-- 历史详情来自 `sacct` 的任务分配记录，包含状态、退出码和分配资源。第一版不汇总 step 级别的实际资源峰值。
-- GPU 数量和内存字段描述申请或分配情况。GPU 利用率、显存曲线和实时内存监控不在第一版范围内。
-- 日志必须能从扩展所在主机访问；只存在于计算节点本地磁盘的文件不能直接预览。
-- 历史任务使用记账系统保存的日志路径；未保存路径时无法直接跟踪。
-- 支持常见日志模板 `%j`、`%A`、`%a`、`%x`、`%u` 和数字补零。需要节点或任务上下文的 `%N`、`%t` 等模板会提示手动打开解析后的文件。
-- Slurm 记账未启用、权限限制或历史已清理时，历史查询可能返回空结果或错误。
-- 扩展不会加载交互式 shell 初始化文件。如果 Slurm 只能在执行 `module load` 后使用，请配置 `binDirectory`，并确保扩展进程具有所需的库路径和 Slurm 环境。
-- 当前版本查询默认集群，不提供联合集群切换。
-- 仅在受信任工作区启用。
-
-## 开发与打包
+## 开发与发布
 
 使用 Node.js 22 或更新版本：
 
 ```bash
 npm ci
 npm test
-npm run package -- --out ../slurm-job-viewer-0.5.0.vsix
+npm run package -- --out ../slurm-job-viewer.vsix
 ```
 
-运行 `npm run compile` 后，在 VS Code 打开源码目录，按 F5 启动扩展开发窗口。使用 Remote-SSH 在登录节点打开源码目录，可以直接调试真实 Slurm 查询。
+在 VS Code 打开源码目录，按 F5 启动扩展开发窗口。真实集群只读检查可先编译，再在登录节点运行 `node test/live-check.cjs`。扩展运行时没有第三方依赖。
 
-扩展运行时没有第三方依赖；安装包只包含编译后的代码、图标、清单和文档。
+扩展 ID 为 `xx025.slurm-job-viewer`。`.github/workflows/publish.yml` 使用 GitHub Actions Trusted Publishing（OIDC）发布：手动运行 `publish=false` 只检查和打包，`publish=true` 发布到市场；发布 GitHub Release 也会触发，标签必须与 `package.json` 的版本一致。
 
-## 市场发布
-
-Marketplace Publisher ID 为 `xx025`，对应扩展 ID 为 `xx025.slurm-job-viewer`。
-
-在发布者的 Trusted Publishing 页面创建 GitHub Actions 策略：
-
-| 字段 | 值 |
-| --- | --- |
-| Policy name | `slurm-job-viewer-release` |
-| Repository owner | `xx025` |
-| Repository | `slurm-job-viewer` |
-| Workflow | `publish.yml` |
-| Environment | 留空 |
-
-工作流位于 `.github/workflows/publish.yml`。手动运行时，`publish=false` 只测试、打包并上传构建附件；`publish=true` 使用 OIDC 发布到市场。正式发布 GitHub Release 时也会触发市场发布，Release 标签必须与 `package.json` 的版本匹配，例如 `v0.5.0`。
-
-English documentation is included as `README.en.md`.
-
-## 原生终端日志标签
-
-点击任务旁的输出图标，或在详情中点击“跟踪标准输出 / 标准错误”，会在底部原生 **终端** 打开日志标签，例如 `Slurm 14115 · stdout`。不同任务、不同输出类型分别保留标签；重复打开已有输出会回到原标签。使用 VS Code 原生终端标签列表切换、重命名或关闭，关闭标签只停止该日志跟踪，不会终止 Slurm 任务。
-
-每 2 秒增量读取一次，首次默认读取末尾 256 KiB（`slurmJobs.logTailKB`）；显示行数由 `terminal.integrated.scrollback` 控制。保留 ANSI、进度条回车刷新，并将普通 LF 转换为终端 CRLF，避免阶梯状换行。使用原生终端的选择、复制、查找、滚动和折行功能。
-
-选中日志终端后，可从命令面板执行 `Slurm：暂停当前日志跟踪 / 继续当前日志跟踪 / 清空当前日志显示`。每个标签独立跟踪，暂停互不影响。这里不启动 Shell，也不接受输入执行命令。
-
-历史任务打开日志时，会额外查询 sacct 保存的 StdOut / StdErr、WorkDir 和 JobIDRaw；兼容数组任务文件名。Slurm 未保存路径时只提示路径缺失，不要求手动选择文件。日志仍须在远端主机上可读；不存在或暂不可读的文件自动重试。程序缓冲可能延迟日志写入，Python 可使用 `python -u`。
+`media/icon.png` 用于扩展市场和扩展列表，`media/icon.svg` 为可编辑源文件；`media/slurm.svg` 用于活动栏。
