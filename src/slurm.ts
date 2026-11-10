@@ -1,6 +1,6 @@
 import { execFile } from "node:child_process";
 import path from "node:path";
-import { ACCOUNT_FIELDS, Job, JobDetails, SEPARATOR, parseAccounting, parseControl, parseQueue, validateJobId } from "./model";
+import { ACCOUNT_FIELDS, ClusterResource, ResourceKind, Job, JobDetails, SEPARATOR, parseAccounting, parseControl, parseQueue, parseResources, validateJobId } from "./model";
 import { UserError } from "./i18n";
 
 export interface Settings {
@@ -57,6 +57,10 @@ export class SlurmClient {
     const user = this.settings().user;
     if (user && user !== "*") { args.push(`--user=${user}`); }
     return parseQueue(await this.run("squeue", args));
+  }
+
+  async resources(kind: ResourceKind): Promise<ClusterResource[]> {
+    return parseResources(await this.run("scontrol", ["show", kind, "--oneliner"]), kind);
   }
 
   async history(id?: string): Promise<JobDetails[]> {

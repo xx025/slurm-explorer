@@ -2,7 +2,7 @@
 
 [English](README.en.md) · [VS Code 扩展市场](https://marketplace.visualstudio.com/items?itemName=xx025.slurm-job-viewer)
 
-在 VS Code 中查看 Slurm 当前任务、历史记录和资源分配，并在**原生终端标签**中持续跟踪日志。支持简体中文和英文，适用于通过 Remote-SSH 连接 Slurm 登录节点，也可在已安装 Slurm 客户端的 Linux 本机运行。
+在 VS Code 中查看 Slurm 当前任务、历史记录、分区和节点资源，并在**原生终端标签**中持续跟踪日志。支持简体中文和英文，适用于通过 Remote-SSH 连接 Slurm 登录节点，也可在已安装 Slurm 客户端的 Linux 本机运行。
 
 ## 安装与更新
 
@@ -11,7 +11,7 @@
 1. 使用 **Remote - SSH** 连接 Slurm 登录节点。
 2. 按 `Ctrl+Shift+X` 打开扩展页，搜索 `@id:xx025.slurm-job-viewer`。
 3. 将 **Slurm Job Viewer** 安装到 **SSH 主机**；如果显示 **Install in SSH: ...**，点击该按钮。
-4. 点击活动栏的 **Slurm** 眼睛图标，查看任务。默认使用远端当前系统用户。
+4. 点击活动栏的 **Slurm** 集群线条图标，查看任务。默认使用远端当前系统用户。
 
 需要 VS Code 1.90 或更新版本。远端必须能运行 `squeue`、`scontrol` 和 `sacct`。扩展直接使用现有 SSH 登录权限，无需额外的 HTTP 服务或令牌。
 
@@ -19,7 +19,7 @@
 
 在 Remote-SSH 窗口的扩展页点击 **… → Check for Extension Updates（检查扩展更新）**，更新安装在 SSH 主机上的扩展。更新后执行 **Developer: Reload Window（开发人员：重新加载窗口）**。
 
-如果更新尚未显示，也可以从 [GitHub Releases](https://github.com/xx025/slurm-job-viewer/releases/latest) 下载 `.vsix`，在远端窗口执行 **Extensions: Install from VSIX...** 安装。访问私有仓库的发布附件需要相应 GitHub 权限。
+如果更新尚未显示，也可以从 [GitHub Releases](https://github.com/xx025/slurm-job-viewer/releases/latest) 下载 `.vsix`，在远端窗口执行 **Extensions: Install from VSIX...** 安装。仓库和发布附件均可公开访问。
 
 任务视图的 **↻** 只刷新任务数据，不检查扩展版本更新。
 
@@ -35,11 +35,20 @@
 
 查看其他用户的任务与日志仍受 Slurm 隐私设置和文件权限约束。
 
+## 分区与节点
+
+Slurm 侧边栏使用 VS Code 原生的三个独立视图：**任务、分区、节点**。点击各自标题可折叠或展开，也可拖动排序、调整高度或通过视图菜单隐藏。分区和节点默认折叠，展开时加载。
+
+- **分区**：显示状态、节点数、CPU 总数；默认分区名称后显示 `*`。点击查看时限、节点范围、允许的账户与用户组及全部控制器字段。
+- **节点**：显示状态、已分配 / 总 CPU 和所属分区。点击查看配置 / 已分配 / 空闲内存、CPU 负载、GPU/GRES、资源配置、分配情况和维护原因等可用字段。
+- 各视图标题的 **↻** 独立刷新。可见视图按 `slurmJobs.refreshSeconds` 自动刷新；设为 `0` 可关闭自动刷新。详情页的**刷新详情**重新查询控制器。
+- 分区与节点使用 `scontrol show partition/node --oneliner`，不受任务的用户范围和文字筛选影响。查询失败保留上次结果，并提供点击重试；权限和返回字段由集群决定。
+
 ## 左侧历史记录
 
 任务树底部固定显示可展开的**历史**分组。首次展开时加载最近 7 天已完成、失败、取消、超时等已结束任务，并按结束时间从新到旧排列。点击历史任务即可打开详情。
 
-- 顶部历史按钮会定位、展开并刷新该分组。
+- 展开历史分组即可查看；也可从命令面板执行 **Show Job History**，定位、展开并刷新该分组。
 - **↻** 同时刷新当前任务和已请求过的历史记录；加载失败时，可点击分组内的提示重试。
 - 自动刷新启用、任务视图可见时，已请求过的历史最多每分钟自动刷新一次。
 - 用户范围和文字筛选同时作用于当前任务和历史；`slurmJobs.historyDays` 控制查询窗口。
@@ -60,6 +69,7 @@ Slurm 14091 · stderr
 
 - **跟踪频率**：每 2 秒读取新增日志，不受任务列表刷新间隔影响。
 - **首次读取**：默认读取文件末尾 256 KiB，之后增量读取；`slurmJobs.logTailKB` 控制单次读取上限。
+- **日志颜色**：默认按级别为完整纯文本行着色：错误红色、警告黄色、成功绿色、信息青色、调试灰色；通过 `slurmJobs.outputColors` 可关闭。程序自带的 ANSI 颜色原样保留；未完成的行和进度条立即显示，不额外着色。
 - **换行和进度条**：保留 ANSI 和 `\r` 回车刷新，将普通 LF 转换为终端 CRLF，避免阶梯状换行。
 - **原生交互**：支持终端的选择、复制、查找、滚动和折行。显示保留行数由 `terminal.integrated.scrollback` 控制。
 - **暂停与继续**：选中日志终端，从命令面板执行 **Pause Current Output / Resume Current Output**；各标签独立暂停。
@@ -91,7 +101,8 @@ Slurm 14091 · stderr
   "slurmJobs.refreshSeconds": 30,
   "slurmJobs.timeoutSeconds": 20,
   "slurmJobs.historyDays": 7,
-  "slurmJobs.logTailKB": 256
+  "slurmJobs.logTailKB": 256,
+  "slurmJobs.outputColors": true
 }
 ```
 
@@ -100,9 +111,10 @@ Slurm 14091 · stderr
 | `slurmJobs.language` | `auto` | `auto` 跟随 VS Code；`zh-cn` 简体中文；`en` 英文 |
 | `slurmJobs.user` | 空字符串 | 使用远端系统用户；`*` 查询所有用户；也可指定用户名 |
 | `slurmJobs.binDirectory` | 空字符串 | Slurm 命令所在绝对目录；留空使用扩展进程的 PATH |
-| `slurmJobs.refreshSeconds` | `30` | 任务列表刷新间隔，0–3600 秒；`0` 关闭任务和历史自动刷新，不影响日志跟踪 |
+| `slurmJobs.refreshSeconds` | `30` | 可见任务、分区、节点视图刷新间隔，0–3600 秒；`0` 关闭视图和历史自动刷新，不影响日志跟踪 |
 | `slurmJobs.timeoutSeconds` | `20` | 单条 Slurm 查询超时，2–120 秒 |
 | `slurmJobs.historyDays` | `7` | 历史及记账查找窗口，1–365 天 |
+| `slurmJobs.outputColors` | `true` | 按日志级别为完整纯文本行自动着色；关闭后仍保留程序自带的 ANSI 颜色 |
 | `slurmJobs.logTailKB` | `256` | 单次日志读取上限，4–4096 KiB；显示保留行数使用原生终端设置 |
 
 ## 命令速查
@@ -115,6 +127,9 @@ Slurm 14091 · stderr
 | Select User Scope | 选择仅自己、所有用户或指定用户 |
 | Change Interface Language | 切换扩展界面语言 |
 | Filter Jobs | 筛选当前任务和历史记录 |
+| Refresh Partitions | 刷新分区列表 |
+| Refresh Nodes | 刷新节点列表 |
+| Show Resource Details | 查看所选分区或节点详情 |
 | Show Job History | 定位、展开并刷新历史分组 |
 | Find Job by ID | 按 ID 查询任务 |
 | Show Job Details | 查看任务详情 |

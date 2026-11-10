@@ -15,7 +15,7 @@
   "view.welcome": "通过 Remote-SSH 连接 Slurm 登录节点，并将扩展安装到该主机。\n[选择用户范围](command:slurm.selectUser)\n[刷新任务](command:slurm.refresh)\n[按 ID 查找任务](command:slurm.lookup)\n[查看查询输出](command:slurm.output)",
   "config.user": "要查询的 Slurm 用户。留空使用远端系统用户，* 表示所有用户。也可通过工具栏选择用户范围。",
   "config.binDirectory": "squeue、scontrol 和 sacct 所在的绝对目录，留空使用扩展主机的 PATH。",
-  "config.refreshSeconds": "可见任务列表的刷新间隔（秒）。0 关闭任务列表自动刷新。各日志终端独立每 2 秒跟踪输出。",
+  "config.refreshSeconds": "可见任务、分区和节点视图的刷新间隔（秒）。0 关闭视图自动刷新。各日志终端独立每 2 秒跟踪输出。",
   "config.timeoutSeconds": "每条 Slurm 查询命令的最长等待时间（秒）。",
   "config.historyDays": "历史任务和按 ID 查找历史任务的时间范围（天）。",
   "config.logTailKB": "每次日志读取的大小上限（KiB），首次从末尾读取。显示行数由 VS Code 原生终端的 scrollback 设置控制。",
@@ -25,5 +25,11 @@
   "language.en": "英语。",
   "command.pauseOutput": "Slurm：暂停当前日志跟踪",
   "command.resumeOutput": "Slurm：继续当前日志跟踪",
-  "command.clearOutput": "Slurm：清空当前日志显示"
+  "command.clearOutput": "Slurm：清空当前日志显示",
+  "config.outputColors": "按日志级别自动为完整的纯文本行着色：错误红色、警告黄色、成功绿色、信息青色、调试灰色。保留程序自带的 ANSI 颜色；未完成的行和进度条立即显示，不额外着色。",
+  "view.partitions": "分区",
+  "view.nodes": "节点",
+  "command.refreshPartitions": "Slurm：刷新分区",
+  "command.refreshNodes": "Slurm：刷新节点",
+  "command.resourceDetails": "Slurm：查看资源详情"
 }

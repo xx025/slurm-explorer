@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.6.0
+
+- Add independent partition and node views with resource summaries, details, manual refresh, visible-view polling and Chinese / English labels.
+- Query cluster resources through scontrol without applying the job user filter.
+
+- Remove the history button from the view toolbar; retain the sidebar History group and command.
+- Color complete plain log lines by severity, with an outputColors setting; preserve native ANSI and immediate progress updates.
+- Redesign activity bar and Marketplace icons around the Slurm stepped node array and outlined SLURM lettering.
+
 ## 0.5.4
 
 - Separate the icon into two distinct layers: the Slurm cluster and lettering above, and a large eye in its own lower band.

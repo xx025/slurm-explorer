@@ -3,12 +3,14 @@ import { JobDetails } from "./model";
 import { Translator } from "./i18n";
 import { logPath } from "./logs";
 import { LogCursor } from "./follow";
+import { LogColors } from "./colors";
 
 /** A pseudoterminal writes to the native terminal without starting a shell. */
 interface Session {
   key: string;
   terminal: vscode.Terminal;
   cursor: LogCursor;
+  colors: LogColors;
   writer: vscode.EventEmitter<string>;
   opened: boolean;
   paused: boolean;
@@ -33,7 +35,7 @@ export class JobOutput implements vscode.Disposable {
   private readonly timer: NodeJS.Timeout;
 
   constructor(private readonly t: Translator, private readonly message: (error: unknown) => string,
-    private readonly maxBytes: () => number) {
+    private readonly maxBytes: () => number, private readonly colorize: () => boolean = () => true) {
     this.timer = setInterval(() => { void this.poll(); }, 2000);
   }
 
@@ -63,7 +65,7 @@ export class JobOutput implements vscode.Disposable {
           }
         }
       });
-      session = { key, terminal, writer, cursor: new LogCursor(filename, this.maxBytes()),
+      session = { key, terminal, writer, cursor: new LogCursor(filename, this.maxBytes()), colors: new LogColors(),
         opened: false, paused: false, error: "", lastCR: false };
       this.sessions.set(key, session);
     }
@@ -92,10 +94,13 @@ export class JobOutput implements vscode.Disposable {
     try {
       const result = await session.cursor.read();
       if (this.disposed || this.sessions.get(session.key) !== session) { return; }
-      if (result.reset) { session.lastCR = false; }
+      if (result.reset || result.skipped) {
+        session.lastCR = false;
+        session.colors.reset();
+      }
       if (result.skipped) { this.write(session, `${this.t("[Showing the last {0} KiB]", this.maxBytes() / 1024)}\n`); }
       if (session.error) { this.write(session, "\n"); session.error = ""; }
-      this.write(session, result.text);
+      this.write(session, session.colors.format(result.text, this.colorize()));
     } catch (error) {
       if (this.disposed || this.sessions.get(session.key) !== session) { return; }
       const text = this.message(error);

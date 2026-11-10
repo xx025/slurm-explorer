@@ -2,7 +2,7 @@
   "name": "slurm-job-viewer",
   "displayName": "Slurm Job Viewer",
   "description": "%extension.description%",
-  "version": "0.5.4",
+  "version": "0.6.0",
   "publisher": "xx025",
   "license": "MIT",
   "engines": {
@@ -22,7 +22,9 @@
   ],
   "main": "./dist/extension.js",
   "activationEvents": [
-    "onView:slurmJobs"
+    "onView:slurmJobs",
+    "onView:slurmPartitions",
+    "onView:slurmNodes"
   ],
   "capabilities": {
     "untrustedWorkspaces": {
@@ -98,6 +100,20 @@
         "command": "slurm.clearOutput",
         "title": "%command.clearOutput%",
         "icon": "$(clear-all)"
+      },
+      {
+        "command": "slurm.refreshPartitions",
+        "title": "%command.refreshPartitions%",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "slurm.refreshNodes",
+        "title": "%command.refreshNodes%",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "slurm.resourceDetails",
+        "title": "%command.resourceDetails%"
       }
     ],
     "viewsContainers": {
@@ -114,6 +130,16 @@
         {
           "id": "slurmJobs",
           "name": "%view.jobs%"
+        },
+        {
+          "id": "slurmPartitions",
+          "name": "%view.partitions%",
+          "visibility": "collapsed"
+        },
+        {
+          "id": "slurmNodes",
+          "name": "%view.nodes%",
+          "visibility": "collapsed"
         }
       ]
     },
@@ -137,11 +163,6 @@
           "group": "navigation@3"
         },
         {
-          "command": "slurm.history",
-          "when": "view == slurmJobs",
-          "group": "navigation@4"
-        },
-        {
           "command": "slurm.lookup",
           "when": "view == slurmJobs",
           "group": "navigation@5"
@@ -155,6 +176,16 @@
           "command": "slurm.language",
           "when": "view == slurmJobs",
           "group": "settings@1"
+        },
+        {
+          "command": "slurm.refreshPartitions",
+          "when": "view == slurmPartitions",
+          "group": "navigation@1"
+        },
+        {
+          "command": "slurm.refreshNodes",
+          "when": "view == slurmNodes",
+          "group": "navigation@1"
         }
       ],
       "view/item/context": [
@@ -232,6 +263,11 @@
             "%language.zh%",
             "%language.en%"
           ]
+        },
+        "slurmJobs.outputColors": {
+          "type": "boolean",
+          "default": true,
+          "description": "%config.outputColors%"
         }
       }
     }

@@ -2,7 +2,7 @@
 
 [简体中文](README.md) · [VS Code Marketplace](https://marketplace.visualstudio.com/items?itemName=xx025.slurm-job-viewer)
 
-View active Slurm jobs, accounting history and resource allocations in VS Code, and follow logs in **native terminal tabs**. Supports English and Simplified Chinese. Use it through Remote-SSH on a Slurm login node, or locally on Linux with Slurm clients installed.
+View active Slurm jobs, accounting history, partitions and node resources in VS Code, and follow logs in **native terminal tabs**. Supports English and Simplified Chinese. Use it through Remote-SSH on a Slurm login node, or locally on Linux with Slurm clients installed.
 
 ## Install and update
 
@@ -11,7 +11,7 @@ View active Slurm jobs, accounting history and resource allocations in VS Code, 
 1. Connect to a Slurm login node using **Remote - SSH**.
 2. Press `Ctrl+Shift+X` and search for `@id:xx025.slurm-job-viewer`.
 3. Install **Slurm Job Viewer** on the **SSH host**. If you see **Install in SSH: ...**, select it.
-4. Open the **Slurm** eye icon in the activity bar. The remote OS user is selected by default.
+4. Open the **Slurm** cluster outline icon in the activity bar. The remote OS user is selected by default.
 
 Requires VS Code 1.90 or newer. The remote host must be able to run `squeue`, `scontrol` and `sacct`. The extension uses your existing SSH permissions; no additional HTTP service or token is needed.
 
@@ -19,7 +19,7 @@ Requires VS Code 1.90 or newer. The remote host must be able to run `squeue`, `s
 
 In the Remote-SSH window, open the Extensions view and choose **… → Check for Extension Updates**. Update the copy installed on the SSH host, then run **Developer: Reload Window**.
 
-If the update is not listed yet, download a `.vsix` from [GitHub Releases](https://github.com/xx025/slurm-job-viewer/releases/latest) and run **Extensions: Install from VSIX...** in the remote window. Access to private repository release assets requires the appropriate GitHub permissions.
+If the update is not listed yet, download a `.vsix` from [GitHub Releases](https://github.com/xx025/slurm-job-viewer/releases/latest) and run **Extensions: Install from VSIX...** in the remote window. The repository and release assets are publicly accessible.
 
 The job view's **↻** button refreshes job data; extension updates are checked separately.
 
@@ -35,11 +35,20 @@ The queue refreshes every 30 seconds by default. Select **↻** for a manual ref
 
 Slurm privacy settings and filesystem permissions still apply when viewing other users' jobs and logs.
 
+## Partitions and nodes
+
+The Slurm sidebar uses three independent native VS Code views: **Jobs, Partitions and Nodes**. Select a view header to collapse or expand it; drag to reorder, resize it, or hide it through the view menu. Partitions and Nodes start collapsed and load when expanded.
+
+- **Partitions:** state, node count and total CPUs; the default partition has a `*` suffix. Open a partition for time limits, node ranges, allowed accounts / groups and all controller fields.
+- **Nodes:** state, allocated / total CPUs and partition membership. Open a node for configured / allocated / free memory, CPU load, GPU/GRES, configured and allocated resources, and maintenance reasons when available.
+- Each view has its own **↻** button. Visible views refresh using `slurmJobs.refreshSeconds`; set it to `0` to disable automatic refresh. **Refresh details** queries the controller again.
+- Resource views use `scontrol show partition/node --oneliner`, independently of the job user scope and text filter. Failed queries retain previous results and offer click-to-retry. Cluster permissions determine visibility and available fields.
+
 ## Sidebar history
 
 A persistent, expandable **History** group appears below active jobs. Expanding it for the first time loads finished jobs from the last 7 days, including completed, failed, cancelled and timed-out jobs, ordered by end time from newest to oldest. Select a historical job to open its details.
 
-- The history toolbar button locates, expands and refreshes this group.
+- Expand the History group directly, or run **Show Job History** from the command palette to locate, expand and refresh it.
 - **↻** refreshes the queue and previously requested history. Select the inline error item to retry a failed history query.
 - With automatic refresh enabled and the job view visible, previously requested history refreshes at most once per minute.
 - User scope and the text filter apply to both active jobs and history. `slurmJobs.historyDays` controls the lookback window.
@@ -60,6 +69,7 @@ Different jobs and output streams retain separate tabs and independent followers
 
 - **Follow interval:** read new content every 2 seconds, independently of queue refresh.
 - **Initial read:** tail up to 256 KiB by default, then read increments. `slurmJobs.logTailKB` limits each read.
+- **Log colors:** complete plain lines are colored by level: errors red, warnings yellow, success green, info cyan and debug gray. Disable this with `slurmJobs.outputColors`. Original ANSI colors pass through unchanged; partial lines and progress updates display immediately without added colors.
 - **Line breaks and progress:** preserve ANSI and `\r` progress updates; normalize bare LF to terminal CRLF to avoid staircase line breaks.
 - **Native interaction:** use terminal selection, copy, find, scrolling and reflow. `terminal.integrated.scrollback` controls retained display lines.
 - **Pause and resume:** select a log terminal and run **Pause Current Output / Resume Current Output** from the command palette. Tabs pause independently.
@@ -91,7 +101,8 @@ Configure these in **Remote Settings**:
   "slurmJobs.refreshSeconds": 30,
   "slurmJobs.timeoutSeconds": 20,
   "slurmJobs.historyDays": 7,
-  "slurmJobs.logTailKB": 256
+  "slurmJobs.logTailKB": 256,
+  "slurmJobs.outputColors": true
 }
 ```
 
@@ -100,9 +111,10 @@ Configure these in **Remote Settings**:
 | `slurmJobs.language` | `auto` | `auto` follows VS Code; `zh-cn` selects Simplified Chinese; `en` selects English |
 | `slurmJobs.user` | Empty | Remote OS user; `*` selects all users; a username selects that user |
 | `slurmJobs.binDirectory` | Empty | Absolute directory containing Slurm commands; empty uses the extension host PATH |
-| `slurmJobs.refreshSeconds` | `30` | Queue refresh interval, 0–3600 seconds; `0` disables queue / history auto-refresh without affecting log followers |
+| `slurmJobs.refreshSeconds` | `30` | Visible job / partition / node view refresh interval, 0–3600 seconds; `0` disables view / history auto-refresh without affecting log followers |
 | `slurmJobs.timeoutSeconds` | `20` | Timeout per Slurm query, 2–120 seconds |
 | `slurmJobs.historyDays` | `7` | Accounting history and lookup window, 1–365 days |
+| `slurmJobs.outputColors` | `true` | Automatically color complete plain log lines by level; original ANSI colors remain when disabled |
 | `slurmJobs.logTailKB` | `256` | Maximum per log read, 4–4096 KiB; display retention uses native terminal settings |
 
 ## Command reference
@@ -115,6 +127,9 @@ Press `Ctrl+Shift+P` and search for `Slurm`. Names below are English; Chinese VS
 | Select User Scope | Choose own, all or a specified user's jobs |
 | Change Interface Language | Choose the extension interface language |
 | Filter Jobs | Filter active jobs and history |
+| Refresh Partitions | Refresh the partition list |
+| Refresh Nodes | Refresh the node list |
+| Show Resource Details | Inspect a selected partition or node |
 | Show Job History | Locate, expand and refresh sidebar history |
 | Find Job by ID | Look up a job by ID |
 | Show Job Details | Open job details |

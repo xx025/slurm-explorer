@@ -6,6 +6,7 @@ import { Settings, SlurmClient } from "./slurm";
 import { createTranslator, errorMessage, resolveLanguage } from "./i18n";
 import { HistoryStore } from "./history";
 import { JobOutput } from "./output";
+import { ClusterViews } from "./cluster";
 
 type Group = { kind: "group"; label: string; jobs: Job[] };
 type JobNode = { kind: "job"; job: Job };
@@ -226,7 +227,10 @@ export function activate(context: vscode.ExtensionContext): void {
   const client = new SlurmClient(settings, text => output.appendLine(`[${new Date().toISOString()}] ${text}`));
   const tree = new JobTree(client);
   const view = vscode.window.createTreeView("slurmJobs", { treeDataProvider: tree, showCollapseAll: true });
-  const jobOutput = new JobOutput(t, message, () => config().get<number>("logTailKB", 256) * 1024);
+  const cluster = new ClusterViews(client, t, language, message);
+  const jobOutput = new JobOutput(t, message,
+    () => config().get<number>("logTailKB", 256) * 1024,
+    () => config().get<boolean>("outputColors", true));
   const panels = new Map<string, vscode.WebviewPanel>();
   const panelDetails = new Map<string, JobDetails>();
   let pendingRefresh: Promise<void> | undefined;
@@ -234,7 +238,7 @@ export function activate(context: vscode.ExtensionContext): void {
   let timer: NodeJS.Timeout | undefined;
   let disposed = false;
   let logRequest = 0;
-  context.subscriptions.push(output, tree, view, jobOutput,
+  context.subscriptions.push(output, tree, view, jobOutput, cluster,
   );
 
   async function refresh(force = false): Promise<void> {
@@ -326,7 +330,7 @@ export function activate(context: vscode.ExtensionContext): void {
   }
 
   register("slurm.refresh", async () => {
-    await Promise.all([refresh(), tree.refreshHistory(true)]);
+    await Promise.all([refresh(), tree.refreshHistory(true), cluster.refreshVisible()]);
   });
   register("slurm.output", () => output.show());
   register("slurm.pauseOutput", () => jobOutput.pause(true));
@@ -397,6 +401,7 @@ export function activate(context: vscode.ExtensionContext): void {
     const seconds = config().get<number>("refreshSeconds", 30);
     if (seconds > 0) {
       timer = setInterval(() => {
+        void cluster.refreshVisible();
         if (view.visible) {
           void refresh();
           if (Date.now() - tree.history.loadedAt >= 60000) { void tree.refreshHistory(true); }
@@ -416,12 +421,14 @@ export function activate(context: vscode.ExtensionContext): void {
           tree.resetHistory();
         }
         if (event.affectsConfiguration("slurmJobs.language")) {
+          cluster.labels();
           tree.update(tree.jobs);
           for (const [id, panel] of panels) {
             const details = panelDetails.get(id);
             if (details) { panel.webview.html = renderDetails(details); }
           }
         }
+        if (event.affectsConfiguration("slurmJobs.binDirectory")) { cluster.reset(); }
         configureTimer();
         void refresh(true);
       }
@@ -434,4 +441,5 @@ export function activate(context: vscode.ExtensionContext): void {
   );
   configureTimer();
   void refresh();
+  void cluster.refreshVisible();
 }

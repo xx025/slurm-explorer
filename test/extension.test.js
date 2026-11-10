@@ -12,7 +12,8 @@ function harness(initialGate) {
   const state = {
     values: { refreshSeconds: 0 }, configurationListeners: [], commands: new Map(),
     selections: [], inputs: [], queries: [], panels: [], errors: [],
-    historyQueries: [], quickPickCalls: 0, executed: [], revealed: [], terminals: []
+    historyQueries: [], quickPickCalls: 0, executed: [], revealed: [], terminals: [],
+    views: new Map(), resourceQueries: []
   };
   class EventEmitter {
     listeners = [];
@@ -73,13 +74,14 @@ function harness(initialGate) {
         state.terminals.push(terminal); return terminal;
       },
       createOutputChannel: () => ({ ...disposable(), appendLine() {}, show() {} }),
-      createTreeView: (_id, options) => {
-        state.tree = options.treeDataProvider;
-        state.view = {
+      createTreeView: (id, options) => {
+        const view = {
           ...disposable(), visible: true, onDidChangeVisibility: () => disposable(),
           reveal: async (element, options) => { state.revealed.push({ element, options }); state.tree.getChildren(element); }
         };
-        return state.view;
+        state.views.set(id, { view, tree: options.treeDataProvider });
+        if (id === "slurmJobs") { state.tree = options.treeDataProvider; state.view = view; }
+        return view;
       },
       showQuickPick: async items => {
         state.quickPickCalls++;
@@ -93,7 +95,7 @@ function harness(initialGate) {
       createWebviewPanel: () => {
         const listeners = [];
         const panel = {
-          webview: { html: "", onDidReceiveMessage: () => disposable() },
+          webview: { html: "", onDidReceiveMessage: listener => { panel.receive = listener; return disposable(); } },
           reveal() {},
           onDidDispose(listener) { listeners.push(listener); return disposable(); },
           dispose() { listeners.forEach(listener => listener()); }
@@ -130,13 +132,24 @@ function harness(initialGate) {
       if (state.historyHandler) { return state.historyHandler(user); }
       return state.historyData.filter(record => user === "*" || record.fields.User === user);
     }
+    async resources(kind) {
+      state.resourceQueries.push(kind);
+      if (state.resourceHandler) { return state.resourceHandler(kind); }
+      return kind === "partition"
+        ? [{ kind, name: "gpu", fields: { PartitionName: "gpu", State: "UP", TotalNodes: "2", TotalCPUs: "128", Default: "YES", Nodes: "gpu[01-02]" }, raw: "PartitionName=gpu State=UP" }]
+        : [{ kind, name: "gpu01", fields: { NodeName: "gpu01", State: "MIXED", CPUAlloc: "16", CPUTot: "64", Partitions: "gpu", Gres: "gpu:a100:4", RealMemory: "256000" }, raw: "NodeName=gpu01 State=MIXED" }];
+    }
   }
   const filename = path.join(__dirname, "../dist/extension.js");
   const realRequire = createRequire(filename);
   const outputModule = { exports: {} };
   new Function("require", "module", "exports", fs.readFileSync(path.join(__dirname, "../dist/output.js"), "utf8"))(
     name => name === "vscode" ? api : realRequire(name), outputModule, outputModule.exports);
-  const injectedRequire = name => name === "vscode" ? api : name === "./slurm" ? { SlurmClient } : name === "./output" ? outputModule.exports : realRequire(name);
+  const clusterModule = { exports: {} };
+  new Function("require", "module", "exports", fs.readFileSync(path.join(__dirname, "../dist/cluster.js"), "utf8"))(
+    name => name === "vscode" ? api : realRequire(name), clusterModule, clusterModule.exports);
+  const injectedRequire = name => name === "vscode" ? api : name === "./slurm" ? { SlurmClient }
+    : name === "./output" ? outputModule.exports : name === "./cluster" ? clusterModule.exports : realRequire(name);
   const module = { exports: {} };
   new Function("require", "module", "exports", fs.readFileSync(filename, "utf8"))(injectedRequire, module, module.exports);
   const context = { subscriptions: [] };
@@ -223,6 +236,115 @@ test("native terminal tabs retain separate task streams, deduplicate and pause i
     assert.match(app.terminals[3].text, /epoch 3\r\n$/);
     assert.deepEqual(app.errors, []);
   } finally { app.dispose(); fs.rmSync(directory, {recursive:true}); }
+});
+
+test("output colors apply to native log tabs and the setting takes effect without reopening", async () => {
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), "slurm-colors-"));
+  const filename = path.join(directory, "job.log");
+  fs.writeFileSync(filename, "INFO starting\nERROR failed\n");
+  const app = harness();
+  try {
+    app.logFile = filename;
+    await app.run("slurm.stdout", "42");
+    const terminal = app.terminals[0];
+    assert.match(terminal.text, /\x1b\[36mINFO starting\x1b\[39m\r\n/);
+    assert.match(terminal.text, /\x1b\[31mERROR failed\x1b\[39m\r\n$/);
+    app.values.outputColors = false;
+    fs.appendFileSync(filename, "WARNING plain\n");
+    await app.run("slurm.stdout", "42");
+    assert.ok(terminal.text.endsWith("\r\nWARNING plain\r\n"));
+    fs.appendFileSync(filename, "\x1b[35mcustom\x1b[0m\n");
+    await app.run("slurm.stdout", "42");
+    assert.ok(terminal.text.endsWith("\x1b[35mcustom\x1b[0m\r\n"));
+  } finally { app.dispose(); fs.rmSync(directory, {recursive:true}); }
+});
+
+test("partition and node views show independent resources and refresh localized details", async () => {
+  const app = harness();
+  try {
+    await settle();
+    const partitions = app.views.get("slurmPartitions");
+    const nodes = app.views.get("slurmNodes");
+    assert.deepEqual(app.resourceQueries.sort(), ["node", "partition"]);
+    const partition = partitions.tree.getChildren()[0];
+    assert.equal(partitions.tree.getTreeItem(partition).label, "gpu *");
+    assert.match(partitions.tree.getTreeItem(partition).description, /2 nodes · 128 CPUs/);
+    const node = nodes.tree.getChildren()[0];
+    assert.match(nodes.tree.getTreeItem(node).description, /CPU 16\/64 · gpu/);
+    await app.run("slurm.resourceDetails", node);
+    const panel = app.panels[0];
+    assert.match(panel.webview.html, /gpu:a100:4/);
+    assert.match(panel.webview.html, /Configured memory/);
+    await app.run("slurm.resourceDetails", node);
+    assert.equal(app.panels.length, 1);
+    app.resourceHandler = async kind => kind === "node"
+      ? [{ ...node, fields: { ...node.fields, CPUAlloc: "32", Reason: "<script>unsafe</script>" } }]
+      : [partition];
+    await panel.receive({action:"refresh"});
+    assert.match(panel.webview.html, />32</);
+    assert.doesNotMatch(panel.webview.html, /<script>unsafe<\/script>/);
+    assert.match(panel.webview.html, /&lt;script&gt;unsafe/);
+    app.selections.push("zh-cn");
+    await app.run("slurm.language");
+    await settle();
+    assert.equal(partitions.view.title, "分区");
+    assert.equal(nodes.view.title, "节点");
+    assert.match(panel.webview.html, /已分配 CPU/);
+    app.selections.push("*");
+    await app.run("slurm.selectUser");
+    assert.equal(partitions.tree.records[0].name, "gpu");
+    assert.equal(nodes.tree.records[0].name, "gpu01");
+    assert.deepEqual(app.errors, []);
+  } finally { app.dispose(); }
+});
+
+test("resource refresh retains previous data on failure, retries, and skips hidden views", async () => {
+  const app = harness();
+  try {
+    await settle();
+    const partitions = app.views.get("slurmPartitions");
+    const nodes = app.views.get("slurmNodes");
+    const previous = nodes.tree.records[0];
+    partitions.view.visible = false;
+    app.resourceQueries.length = 0;
+    app.resourceHandler = async () => { throw new Error("controller unavailable"); };
+    await app.run("slurm.refresh");
+    assert.deepEqual(app.resourceQueries, ["node"]);
+    assert.equal(nodes.tree.records[0], previous);
+    assert.match(nodes.view.message, /Showing previous results.*controller unavailable/);
+    const retry = nodes.tree.getTreeItem(nodes.tree.getChildren().at(-1));
+    assert.equal(retry.command.command, "slurm.refreshNodes");
+    await app.run("slurm.resourceDetails", previous);
+    await app.panels[0].receive({action:"refresh"});
+    assert.equal(app.errors.at(-1), "controller unavailable");
+    app.resourceHandler = async () => [];
+    await app.run(retry.command.command);
+    assert.equal(nodes.tree.records.length, 0);
+    assert.equal(nodes.view.message, undefined);
+    assert.match(nodes.tree.getTreeItem(nodes.tree.getChildren()[0]).label, /No resources/);
+  } finally { app.dispose(); }
+});
+
+test("resource reads deduplicate and reset ignores results from the previous binary configuration", async () => {
+  const app = harness();
+  let release;
+  try {
+    await settle();
+    const nodes = app.views.get("slurmNodes");
+    const old = nodes.tree.records[0];
+    app.resourceHandler = () => new Promise(resolve => { release = resolve; });
+    const first = app.run("slurm.refreshNodes");
+    await settle();
+    const second = app.run("slurm.refreshNodes");
+    const finishOld = release;
+    nodes.tree.reset();
+    app.resourceHandler = async () => [];
+    await app.run("slurm.refreshNodes");
+    finishOld([old]);
+    await Promise.all([first, second]);
+    assert.deepEqual(nodes.tree.records, []);
+    assert.deepEqual(nodes.tree.getChildren(), [{status:"empty"}]);
+  } finally { app.dispose(); }
 });
 
 test("history output enriches known accounting metadata before opening a native tab", async () => {

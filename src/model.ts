@@ -48,6 +48,14 @@ export function parseQueue(text: string): Job[] {
 }
 
 export function parseControl(text: string, id: string): JobDetails {
+  const fields = parseControlFields(text);
+  if (!fields.JobId) {
+    throw new UserError("scontrol did not return a job record.");
+  }
+  return { id, fields, raw: text.trim(), source: "scontrol" };
+}
+
+export function parseControlFields(text: string): Record<string, string> {
   const fields: Record<string, string> = {};
   const matches = [...text.matchAll(/(?:^|\s)([A-Za-z][A-Za-z0-9_:/]*)=/g)];
   for (let index = 0; index < matches.length; index++) {
@@ -55,10 +63,24 @@ export function parseControl(text: string, id: string): JobDetails {
     const start = match.index! + match[0].length;
     fields[match[1]] = text.slice(start, matches[index + 1]?.index ?? text.length).trim();
   }
-  if (!fields.JobId) {
-    throw new UserError("scontrol did not return a job record.");
-  }
-  return { id, fields, raw: text.trim(), source: "scontrol" };
+  return fields;
+}
+
+export type ResourceKind = "partition" | "node";
+export interface ClusterResource {
+  kind: ResourceKind;
+  name: string;
+  fields: Record<string, string>;
+  raw: string;
+}
+
+export function parseResources(text: string, kind: ResourceKind): ClusterResource[] {
+  const key = kind === "partition" ? "PartitionName" : "NodeName";
+  return text.split(/\r?\n/).filter(line => line.trim()).map(raw => {
+    const fields = parseControlFields(raw);
+    if (!fields[key]) { throw new UserError("Unexpected scontrol {0} output.", [kind]); }
+    return { kind, name: fields[key], fields, raw: raw.trim() };
+  }).sort((a, b) => a.name.localeCompare(b.name, "en", { numeric: true }));
 }
 
 export const ACCOUNT_FIELDS = [
