@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.5.3
+
+- Restyle the Marketplace icon with blue cluster blocks, black SLURM lettering and a small eye detail on a white background.
+
 ## 0.5.2
 
 - Use an eye and prominent SLURM lettering for the Marketplace icon, with a matching eye icon in the activity bar.
