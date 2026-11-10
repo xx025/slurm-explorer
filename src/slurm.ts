@@ -99,6 +99,30 @@ export class SlurmClient {
     }
   }
 
+  async batchScript(value: string): Promise<string> {
+    const id = validateJobId(value);
+    const unavailable = () => new UserError("Job {0} has no retrievable batch script. It may be an interactive job, purged, inaccessible, or accounting may not store scripts (AccountingStoreFlags=job_script).", [id]);
+    const script = (text: string): string => {
+      if (!text.trim() || text.trim() === "NONE") { throw unavailable(); }
+      return text;
+    };
+    let controlError: unknown;
+    try {
+      // '-' sends the stored script to stdout instead of creating a remote file.
+      return script(await this.run("scontrol", ["write", "batch_script", id, "-"]));
+    } catch (error) { controlError = error; }
+    const date = new Date(Date.now() - this.settings().historyDays * 86400000);
+    const start = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+    try {
+      // --noheader omits sacct's banner; NONE means no stored script.
+      return script(await this.run("sacct", ["--batch-script", `--jobs=${id}`, "--noheader", "--array", `--starttime=${start}`]));
+    } catch (accountError) {
+      throw new UserError("{0}\nController: {1}\nAccounting: {2}", [unavailable(),
+        controlError instanceof Error ? controlError : String(controlError),
+        accountError instanceof Error ? accountError : String(accountError)]);
+    }
+  }
+
   async logDetails(value: string, known?: JobDetails): Promise<JobDetails> {
     const id = validateJobId(value);
     const details = known ?? await this.details(id);

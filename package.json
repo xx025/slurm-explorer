@@ -2,7 +2,7 @@
   "name": "slurm-job-viewer",
   "displayName": "Slurm Explorer",
   "description": "%extension.description%",
-  "version": "0.6.2",
+  "version": "0.6.3",
   "publisher": "xx025",
   "license": "MIT",
   "engines": {
@@ -99,6 +99,11 @@
       {
         "command": "slurm.resourceDetails",
         "title": "%command.resourceDetails%"
+      },
+      {
+        "command": "slurm.script",
+        "title": "%command.script%",
+        "icon": "$(file-code)"
       }
     ],
     "viewsContainers": {
@@ -188,6 +193,11 @@
           "command": "slurm.copyId",
           "when": "view == slurmJobs && viewItem == slurmJob",
           "group": "logs@2"
+        },
+        {
+          "command": "slurm.script",
+          "when": "view == slurmJobs && viewItem == slurmJob",
+          "group": "logs@3"
         }
       ]
     },

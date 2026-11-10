@@ -6,6 +6,7 @@ import { Settings, SlurmClient } from "./slurm";
 import { createTranslator, errorMessage, resolveLanguage } from "./i18n";
 import { HistoryStore } from "./history";
 import { JobOutput } from "./output";
+import { JobScripts } from "./scripts";
 import { ClusterViews } from "./cluster";
 
 type Group = { kind: "group"; label: string; jobs: Job[] };
@@ -212,7 +213,7 @@ summary{cursor:pointer;padding:12px 0}.note{color:var(--vscode-descriptionForegr
 </style></head><body>
 <h1>${escape(t("Job {0}", details.id))} · ${escape(fields.JobName || "")}</h1>
 <p class="meta">${escape(details.source)} · ${escape(new Date().toLocaleString(locale()))}</p>
-<div class="actions"><button data-action="refresh">${escape(t("Refresh details"))}</button><button data-action="stdout">${escape(t("Open stdout"))}</button><button data-action="stderr">${escape(t("Open stderr"))}</button></div>
+<div class="actions"><button data-action="refresh">${escape(t("Refresh details"))}</button><button data-action="stdout">${escape(t("Open stdout"))}</button><button data-action="stderr">${escape(t("Open stderr"))}</button><button data-action="script">${escape(t("View batch script"))}</button></div>
 <table aria-label="${escape(t("Job details"))}">${rows}</table>
 <p class="note">${escape(t("Resource fields describe the request or allocation. Live GPU utilization and actual memory usage require additional cluster accounting or monitoring."))}
 ${details.source === "sacct" ? escape(t("This job was loaded from accounting. Controller-only fields such as log paths may be unavailable.")) : ""}</p>
@@ -229,6 +230,7 @@ export function activate(context: vscode.ExtensionContext): void {
   const view = vscode.window.createTreeView("slurmJobs", { treeDataProvider: tree, showCollapseAll: true });
   const cluster = new ClusterViews(client, t, language, message);
   const jobOutput = new JobOutput();
+  const jobScripts = new JobScripts(client);
   const panels = new Map<string, vscode.WebviewPanel>();
   const panelDetails = new Map<string, JobDetails>();
   let pendingRefresh: Promise<void> | undefined;
@@ -236,7 +238,8 @@ export function activate(context: vscode.ExtensionContext): void {
   let timer: NodeJS.Timeout | undefined;
   let disposed = false;
   let logRequest = 0;
-  context.subscriptions.push(output, tree, view, jobOutput, cluster,
+  let scriptRequest = 0;
+  context.subscriptions.push(output, tree, view, jobOutput, jobScripts, cluster,
   );
 
   async function refresh(force = false): Promise<void> {
@@ -289,6 +292,11 @@ export function activate(context: vscode.ExtensionContext): void {
     await jobOutput.open(details, stream, () => request === logRequest);
   }
 
+  async function openScript(id: string): Promise<void> {
+    const request = ++scriptRequest;
+    await jobScripts.open(id, () => request === scriptRequest);
+  }
+
   async function showDetails(id: string, known?: JobDetails): Promise<void> {
     const existing = panels.get(id);
     if (existing) { existing.reveal(); return; }
@@ -300,6 +308,10 @@ export function activate(context: vscode.ExtensionContext): void {
     const panel = vscode.window.createWebviewPanel("slurmDetails", `Slurm ${id}`, vscode.ViewColumn.Active, {
       enableScripts: true, localResourceRoots: [], retainContextWhenHidden: false
     });
+    panel.iconPath = {
+      light: vscode.Uri.joinPath(context.extensionUri, "media", "slurm-light.svg"),
+      dark: vscode.Uri.joinPath(context.extensionUri, "media", "slurm.svg")
+    };
     panels.set(id, panel);
     let current = details;
     let busy = false;
@@ -315,6 +327,7 @@ export function activate(context: vscode.ExtensionContext): void {
           if (!closed) { panelDetails.set(id, current); panel.webview.html = renderDetails(current); }
         } else if (data.action === "stdout") { await openLog(id, "StdOut", current); }
         else if (data.action === "stderr") { await openLog(id, "StdErr", current); }
+        else if (data.action === "script") { await openScript(id); }
       } catch (error) { void vscode.window.showErrorMessage(message(error)); }
       finally { busy = false; }
     });
@@ -381,6 +394,10 @@ export function activate(context: vscode.ExtensionContext): void {
   register("slurm.stderr", async input => {
     const id = await chooseId(input);
     if (id) { await openLog(id, "StdErr", typeof input === "object" && input.kind === "historyJob" ? input.details : undefined); }
+  });
+  register("slurm.script", async input => {
+    const id = await chooseId(input);
+    if (id) { await openScript(id); }
   });
   register("slurm.copyId", async input => { const id = await chooseId(input); if (id) { await vscode.env.clipboard.writeText(id); } });
   register("slurm.history", async () => {

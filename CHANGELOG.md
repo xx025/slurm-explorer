@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.6.3
+
+- Add View Batch Script to job details, job context menus and the command palette. Open the controller-stored submission script as a read-only editor document; reuse tabs and refresh on reopen.
+- Fall back to sacct --batch-script for historical records, with explicit unavailable / permission diagnostics when scripts are not retained.
+- Add Slurm tab icons to job details with separate light and dark theme assets.
+- Verify script retrieval over SSH against a running job and the unavailable historical-script fallback.
+
 ## 0.6.2
 
 - Open actual stdout / stderr files in persistent VS Code editor tabs, including resolved historical log paths and merged streams.

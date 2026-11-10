@@ -86,6 +86,16 @@ Opening historical output queries accounting on demand for retained fields such 
 
 An explicitly empty controller stderr path uses the merged stdout file. Supported patterns include `%j`, `%A`, `%a`, `%x`, `%u` and numeric padding. Patterns requiring node or task context, such as `%N` or `%t`, may remain unresolved.
 
+## View the submitted batch script
+
+Select **View batch script** in job details, right-click an active or historical job and choose **View Batch Script**, or run **Slurm: View Batch Script** from the command palette and enter a job ID.
+
+The extension uses `scontrol write batch_script <job_id> -` to retrieve the controller-stored submission script and opens it in a read-only `slurm-<job_id>.sh` editor tab. It never executes the script or reads / overwrites a later-edited working copy. Reopening fetches the snapshot again and reuses the same tab. Job detail tabs use a Slurm icon with light and dark theme variants.
+
+This is the script submitted to Slurm. If a submission tool rendered a template first, its rendered content appears here. Shell variables, command substitutions and runtime-generated commands remain unexpanded.
+
+If the controller no longer retains the script, the extension tries `sacct --batch-script --jobs=<job_id> --noheader`. Historical scripts require `AccountingStoreFlags=job_script` and a retained record within `slurmJobs.historyDays`. Interactive jobs, denied access, missing scripts and purged records produce explicit errors. Slurm permissions still control script access.
+
 ## Languages and settings
 
 Run **Slurm: Change Interface Language** from the command palette or the job view's More Actions menu to select Follow VS Code, Simplified Chinese or English. Chinese editor locales default to Simplified Chinese; other locales default to English.
@@ -132,6 +142,7 @@ Press `Ctrl+Shift+P` and search for `Slurm`. Names below are English; Chinese VS
 | Show Job Details | Open job details |
 | Open Standard Output File | Open stdout in the file editor |
 | Open Standard Error File | Open stderr in the file editor |
+| View Batch Script | Open Slurm’s stored submission script in a read-only editor |
 | Copy Job ID | Copy a job ID |
 | Show Query Output | View query commands and diagnostics |
 

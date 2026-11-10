@@ -86,6 +86,16 @@ GPU 数量优先读取 `CfgTRES` / `AllocTRES`，并兼容 `Gres` / `GresUsed`�
 
 控制器明确返回空的 stderr 路径时，使用合并后的 stdout。支持 `%j`、`%A`、`%a`、`%x`、`%u` 和数字补零；需要节点或任务上下文的模板（如 `%N`、`%t`）可能无法解析。
 
+## 查看提交脚本
+
+在作业详情页点击**查看提交脚本**，或右键当前 / 历史作业选择同名操作；也可从命令面板运行 **Slurm: 查看提交脚本** 并输入作业 ID。
+
+扩展使用 `scontrol write batch_script <job_id> -` 获取 Slurm 控制器保存的脚本，在只读的 `slurm-<job_id>.sh` 文件标签中打开。不会执行脚本，也不会读取或覆盖提交目录里后来修改过的脚本；重复打开会重新查询并复用同一标签。作业详情标签页显示 Slurm 图标，适配浅色和深色主题。
+
+这份内容是提交时交给 Slurm 的脚本快照。如果提交工具事先渲染了模板，可以在此查看渲染后的内容；Shell 变量、命令替换和运行时生成的命令不会自动展开。
+
+控制器不再保留脚本时，会尝试 `sacct --batch-script --jobs=<job_id> --noheader`。历史脚本要求集群配置 `AccountingStoreFlags=job_script`，且记录仍保留在 `slurmJobs.historyDays` 查询范围内。交互任务、无权访问、脚本未保存或记录已清理时，显示原因；脚本访问仍受 Slurm 权限限制。
+
 ## 中英文与设置
 
 在任务视图的更多操作菜单或命令面板运行 **Slurm: Change Interface Language**，选择跟随 VS Code、简体中文或英文。默认中文编辑器使用简体中文，其他语言使用英文。
@@ -132,6 +142,7 @@ GPU 数量优先读取 `CfgTRES` / `AllocTRES`，并兼容 `Gres` / `GresUsed`�
 | Show Job Details | 查看任务详情 |
 | Open Standard Output File | 在文件编辑器中打开 stdout |
 | Open Standard Error File | 在文件编辑器中打开 stderr |
+| View Batch Script | 查看 Slurm 保存的提交脚本 |
 | Copy Job ID | 复制任务 ID |
 | Show Query Output | 查看查询命令和诊断 |
 

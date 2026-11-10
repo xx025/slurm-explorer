@@ -26,5 +26,6 @@
   "view.nodes": "Nodes",
   "command.refreshPartitions": "Slurm: Refresh Partitions",
   "command.refreshNodes": "Slurm: Refresh Nodes",
-  "command.resourceDetails": "Slurm: Show Resource Details"
+  "command.resourceDetails": "Slurm: Show Resource Details",
+  "command.script": "Slurm: View Batch Script"
 }

@@ -26,5 +26,6 @@
   "view.nodes": "节点",
   "command.refreshPartitions": "Slurm：刷新分区",
   "command.refreshNodes": "Slurm：刷新节点",
-  "command.resourceDetails": "Slurm：查看资源详情"
+  "command.resourceDetails": "Slurm：查看资源详情",
+  "command.script": "Slurm: 查看提交脚本"
 }

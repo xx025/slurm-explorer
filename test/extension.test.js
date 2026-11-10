@@ -13,7 +13,7 @@ function harness(initialGate) {
     values: { refreshSeconds: 0 }, configurationListeners: [], commands: new Map(),
     selections: [], inputs: [], queries: [], panels: [], errors: [],
     historyQueries: [], quickPickCalls: 0, executed: [], revealed: [], terminals: [], documents: new Map(), editors: [],
-    views: new Map(), resourceQueries: []
+    views: new Map(), resourceQueries: [], providers: new Map(), closeListeners: [], scriptQueries: []
   };
   class EventEmitter {
     listeners = [];
@@ -44,8 +44,13 @@ function harness(initialGate) {
       }));
     }
   };
+  const uri = (scheme, filename) => ({ fsPath: filename, path: filename, scheme, toString: () => `${scheme}:${filename}` });
   const api = {
-    Uri: { file: filename => ({ fsPath: filename, scheme: "file" }) },
+    Uri: {
+      file: filename => uri("file", filename),
+      from: value => uri(value.scheme, value.path),
+      joinPath: (base, ...segments) => uri(base.scheme, path.join(base.fsPath, ...segments))
+    },
     EventEmitter,
     TreeItem: class { constructor(label) { this.label = label; } },
     ThemeIcon: class {},
@@ -59,14 +64,21 @@ function harness(initialGate) {
       openTextDocument: async uri => {
         if (state.documentGate) { await state.documentGate(uri); }
         if (!state.documents.has(uri.fsPath)) {
-          const text = await fs.promises.readFile(uri.fsPath, "utf8");
-          state.documents.set(uri.fsPath, { uri, getText: () => text });
+          const provider = state.providers.get(uri.scheme);
+          let text = provider ? await provider.provideTextDocumentContent(uri) : await fs.promises.readFile(uri.fsPath, "utf8");
+          state.documents.set(uri.fsPath, { uri, getText: () => text, isReadonly: !!provider });
+          if (provider) { provider.onDidChange(async changed => {
+            if (changed.toString() === uri.toString()) { text = await provider.provideTextDocumentContent(uri); }
+          }); }
         }
         return state.documents.get(uri.fsPath);
       },
       textDocuments: [],
-      registerTextDocumentContentProvider: () => disposable(),
-      onDidCloseTextDocument: () => disposable(),
+      registerTextDocumentContentProvider: (scheme, provider) => {
+        state.providers.set(scheme, provider);
+        return { dispose: () => state.providers.delete(scheme) };
+      },
+      onDidCloseTextDocument: listener => { state.closeListeners.push(listener); return disposable(); },
       onDidChangeConfiguration: listener => {
         state.configurationListeners.push(listener);
         return disposable();
@@ -135,6 +147,11 @@ function harness(initialGate) {
       if (state.detailsHandler) { return state.detailsHandler(id); }
       return { id, source: "scontrol", fields: { JobId: id, JobName: "<script>test</script>", JobState: "RUNNING", ...(state.logFile ? {StdOut: state.logFile, StdErr: ""} : {}) }, raw: "JobId=" + id };
     }
+    async batchScript(id) {
+      state.scriptQueries.push(id);
+      if (state.scriptHandler) { return state.scriptHandler(id); }
+      return '#!/bin/bash\n#SBATCH --job-name=submitted\necho "$SLURM_JOB_ID"\n';
+    }
     async logDetails(id, known) {
       if (state.logDetailsHandler) { return state.logDetailsHandler(id, known); }
       return known ?? this.details(id);
@@ -158,14 +175,17 @@ function harness(initialGate) {
   const outputModule = { exports: {} };
   new Function("require", "module", "exports", fs.readFileSync(path.join(__dirname, "../dist/output.js"), "utf8"))(
     name => name === "vscode" ? api : realRequire(name), outputModule, outputModule.exports);
+  const scriptsModule = { exports: {} };
+  new Function("require", "module", "exports", fs.readFileSync(path.join(__dirname, "../dist/scripts.js"), "utf8"))(
+    name => name === "vscode" ? api : realRequire(name), scriptsModule, scriptsModule.exports);
   const clusterModule = { exports: {} };
   new Function("require", "module", "exports", fs.readFileSync(path.join(__dirname, "../dist/cluster.js"), "utf8"))(
     name => name === "vscode" ? api : realRequire(name), clusterModule, clusterModule.exports);
   const injectedRequire = name => name === "vscode" ? api : name === "./slurm" ? { SlurmClient }
-    : name === "./output" ? outputModule.exports : name === "./cluster" ? clusterModule.exports : realRequire(name);
+    : name === "./output" ? outputModule.exports : name === "./scripts" ? scriptsModule.exports : name === "./cluster" ? clusterModule.exports : realRequire(name);
   const module = { exports: {} };
   new Function("require", "module", "exports", fs.readFileSync(filename, "utf8"))(injectedRequire, module, module.exports);
-  const context = { subscriptions: [] };
+  const context = { subscriptions: [], extensionUri: api.Uri.file(path.join(__dirname, "..")) };
   module.exports.activate(context);
   state.own = own;
   state.other = other;
@@ -487,4 +507,76 @@ test("failed history queries can be retried in the sidebar and empty history rem
     assert.equal(app.quickPickCalls, 0);
     assert.deepEqual(app.errors, []);
   } finally { app.dispose(); }
+});
+
+test("job details tabs use the Slurm icon in both themes and expose a translated script action", async () => {
+  const app = harness();
+  try {
+    await app.run("slurm.details", "42");
+    const panel = app.panels[0];
+    assert.equal(path.basename(panel.iconPath.light.fsPath), "slurm-light.svg");
+    assert.equal(path.basename(panel.iconPath.dark.fsPath), "slurm.svg");
+    for (const icon of [panel.iconPath.light, panel.iconPath.dark]) { assert.ok(fs.existsSync(icon.fsPath)); }
+    assert.match(panel.webview.html, /data-action="script">View batch script/);
+    await panel.receive({ action: "script" });
+    assert.deepEqual(app.scriptQueries, ["42"]);
+    const editor = app.editors[0];
+    assert.equal(editor.document.uri.scheme, "slurm-script");
+    assert.equal(path.basename(editor.document.uri.path), "slurm-42.sh");
+    assert.equal(editor.document.isReadonly, true);
+    assert.match(editor.document.getText(), /echo "\$SLURM_JOB_ID"/);
+    assert.equal(editor.options.preview, false);
+    app.selections.push("zh-cn"); await app.run("slurm.language"); await settle();
+    assert.match(panel.webview.html, /查看提交脚本/);
+    await app.run("slurm.script", {kind:"historyJob", details:app.historyData[0]});
+    assert.equal(app.scriptQueries.at(-1), "100");
+    assert.equal(path.basename(app.editors.at(-1).document.uri.path), "slurm-100.sh");
+    assert.equal(app.terminals.length, 0);
+  } finally { app.dispose(); }
+});
+
+test("script command refreshes the same document and reports errors without opening a false snapshot", async () => {
+  const app = harness();
+  try {
+    await app.run("slurm.script", "42");
+    const document = app.editors[0].document;
+    app.scriptHandler = async () => "#!/bin/bash\necho updated\n";
+    await app.run("slurm.script", "42"); await settle();
+    assert.equal(app.editors[1].document, document);
+    assert.equal(document.getText(), "#!/bin/bash\necho updated\n");
+    app.scriptHandler = async () => { throw new Error("script not retained"); };
+    await app.run("slurm.script", "101");
+    assert.equal(app.editors.length, 2);
+    assert.equal(app.errors.at(-1), "script not retained");
+  } finally { app.dispose(); }
+});
+
+test("concurrent script reads deduplicate and only the latest selected job gains focus", async () => {
+  const app = harness();
+  let release;
+  const gate = new Promise(resolve => { release = resolve; });
+  try {
+    app.scriptHandler = async id => { if (id === "42") { await gate; } return "#!/bin/bash\necho " + id + "\n"; };
+    const first = app.run("slurm.script", "42");
+    const duplicate = app.run("slurm.script", "42");
+    await settle();
+    await app.run("slurm.script", "43");
+    release(); await Promise.all([first, duplicate]);
+    assert.deepEqual(app.scriptQueries, ["42", "43"]);
+    assert.equal(app.editors.length, 1);
+    assert.equal(path.basename(app.editors[0].document.uri.path), "slurm-43.sh");
+  } finally { release(); app.dispose(); }
+});
+
+test("a script query finishing after disposal does not open an editor", async () => {
+  const app = harness();
+  let release;
+  const gate = new Promise(resolve => { release = resolve; });
+  try {
+    app.scriptHandler = async () => { await gate; return "#!/bin/bash\ntrue\n"; };
+    const pending = app.run("slurm.script", "42"); await settle();
+    app.dispose(); release(); await pending;
+    assert.equal(app.editors.length, 0);
+    assert.equal(app.providers.has("slurm-script"), false);
+  } finally { release(); }
 });

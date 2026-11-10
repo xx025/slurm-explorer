@@ -2,6 +2,9 @@ export type Language = "en" | "zh-cn";
 export type Translator = (text: string, ...values: (string | number)[]) => string;
 
 const chinese: Record<string, string> = {
+  "{0}\nController: {1}\nAccounting: {2}": "{0}\n控制器：{1}\n记账：{2}",
+  "View batch script": "查看提交脚本",
+  "Job {0} has no retrievable batch script. It may be an interactive job, purged, inaccessible, or accounting may not store scripts (AccountingStoreFlags=job_script).": "无法获取作业 {0} 的提交脚本。可能是交互任务、记录已清理、无权访问，或记账未保存脚本（AccountingStoreFlags=job_script）。",
   "Partitions": "分区",
   "Cluster nodes": "节点",
   "Cluster node": "节点",

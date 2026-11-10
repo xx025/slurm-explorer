@@ -156,3 +156,42 @@ test("old accounting without log fields keeps history working and does not inven
   assert.equal(result, known);
   assert.throws(() => logPath(result, "StdOut"), /did not retain a log path/);
 });
+
+test("batch scripts come from the controller snapshot via stdout with safe IDs and configured limits", async () => {
+  const calls = [];
+  const original = '#!/bin/bash\n#SBATCH --job-name=rendered\necho "$SLURM_JOB_ID"\n';
+  const client = new SlurmClient(() => ({ ...defaultSettings(), binDirectory: "/opt/slurm/bin" }), () => {},
+    async (command, args, timeout) => { calls.push({ command, args, timeout }); return original; });
+  assert.equal(await client.batchScript("123_4"), original);
+  assert.deepEqual(calls, [{ command: "/opt/slurm/bin/scontrol", args: ["write", "batch_script", "123_4", "-"], timeout: 2000 }]);
+  await assert.rejects(client.batchScript("123;touch bad"), /numeric job ID/);
+  assert.equal(calls.length, 1);
+});
+
+test("purged controller scripts fall back to accounting without banner or text transformations", async () => {
+  const calls = [];
+  const text = '#!/usr/bin/env bash\n\necho "  literal  "\n';
+  const client = new SlurmClient(defaultSettings, () => {}, async (command, args) => {
+    calls.push({ command, args });
+    if (command === "scontrol") { throw new Error("Invalid job id specified"); }
+    return text;
+  });
+  assert.equal(await client.batchScript("123_4"), text);
+  assert.equal(calls[1].command, "sacct");
+  for (const argument of ["--batch-script", "--jobs=123_4", "--noheader", "--array"]) { assert.ok(calls[1].args.includes(argument)); }
+  assert.ok(calls[1].args.some(arg => /^--starttime=\d{4}-\d{2}-\d{2}$/.test(arg)));
+});
+
+test("absent, interactive, unsupported and denied scripts show actionable errors instead of fake scripts", async () => {
+  for (const result of ["NONE\n", "", " \n"]) {
+    const client = new SlurmClient(defaultSettings, () => {}, async command => {
+      if (command === "scontrol") { throw new Error("Invalid job id specified"); }
+      return result;
+    });
+    await assert.rejects(client.batchScript("42"), /AccountingStoreFlags=job_script/);
+  }
+  const client = new SlurmClient(defaultSettings, () => {}, async command => {
+    throw new Error(command === "scontrol" ? "Access denied" : "unrecognized option --batch-script");
+  });
+  await assert.rejects(client.batchScript("42"), error => /Access denied/.test(error.message) && /unrecognized option/.test(error.message));
+});

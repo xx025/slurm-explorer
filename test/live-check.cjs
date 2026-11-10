@@ -33,6 +33,12 @@ async function check() {
         item.logs[stream] = { readable: false, reason: error.message };
       }
     }
+    try {
+      const script = await client.batchScript(job.id);
+      item.batchScript = { available: true, bytes: Buffer.byteLength(script) };
+    } catch (error) {
+      item.batchScript = { available: false, reason: error.message };
+    }
     report.jobs.push(item);
   }
   const history = await client.history();
