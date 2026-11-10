@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.6.2
+
+- Open actual stdout / stderr files in persistent VS Code editor tabs, including resolved historical log paths and merged streams.
+- Let native editor features and log-highlighting extensions handle display, colors and file updates.
+- Remove pseudoterminal log following, generated ANSI colors, pause / resume / clear commands, and terminal-only settings.
+- Keep delayed log requests from stealing focus after a newer click or extension disposal.
+
 ## 0.6.1
 
 - Show allocated / total GPU counts in node rows, tooltips and details, with TRES and GRES fallback parsing.

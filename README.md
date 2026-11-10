@@ -2,7 +2,7 @@
 
 [English](README.en.md) · [VS Code 扩展市场](https://marketplace.visualstudio.com/items?itemName=xx025.slurm-job-viewer)
 
-在 VS Code 中查看 Slurm 当前任务、历史记录、分区和节点资源，并在**原生终端标签**中持续跟踪日志。支持简体中文和英文，适用于通过 Remote-SSH 连接 Slurm 登录节点，也可在已安装 Slurm 客户端的 Linux 本机运行。
+在 VS Code 中查看 Slurm 当前任务、历史记录、分区和节点资源，并在**文件编辑器标签**中打开日志。支持简体中文和英文，适用于通过 Remote-SSH 连接 Slurm 登录节点，也可在已安装 Slurm 客户端的 Linux 本机运行。
 
 ## 安装与更新
 
@@ -57,33 +57,32 @@ GPU 数量优先读取 `CfgTRES` / `AllocTRES`，并兼容 `Gres` / `GresUsed`�
 
 历史来自 `sacct` 的任务分配记录。集群未启用记账、权限不足或记录已清理时，结果可能为空或显示查询错误。
 
-## 原生终端多标签日志
+## 文件编辑器日志
 
-点击任务旁的输出图标，或在详情页点击**跟踪标准输出 / 标准错误**，会在底部 **终端** 中打开原生标签：
+点击任务旁的输出图标，或在详情页点击**打开标准输出 / 标准错误**，直接在 VS Code 编辑器中打开实际日志文件。日志使用固定标签（不使用预览标签），重复打开同一文件会复用已有文档；合并到 stdout 的 stderr 会打开同一文件。
 
-```text
-Slurm 14115 · stdout
-Slurm 14091 · stdout
-Slurm 14091 · stderr
+- 使用编辑器原生的搜索、选择、复制、折行和分屏功能。内容保持原样，不插入颜色控制字符。
+- 文件更新由 VS Code 的文件机制处理；扩展不再轮询日志，也不提供终端自动滚动、暂停或清空操作。编辑器打开完整文件，大文件限制由 VS Code 处理。
+- 日志高亮可使用 **Log File Highlighter**（`emilast.LogFileHighlighter`）。对于 `.out` / `.err`，可点击右下角语言模式选择 **Log**，或按文件名配置关联：
+
+```json
+{
+  "files.associations": {
+    "slurm-*.out": "log",
+    "slurm-*.err": "log"
+  }
+}
 ```
 
-不同任务、不同输出类型分别保留标签并独立跟踪；重复打开同一输出会回到已有标签。使用 VS Code 原生终端标签列表切换、重命名和关闭，关闭标签只停止该日志跟踪，不会终止 Slurm 任务。若没有看到标签列表，可在设置中启用 **Terminal › Integrated › Tabs: Enabled**。
+自定义日志名可按需增加关联。Slurm Explorer 不会自动安装其他扩展或修改文件关联。
 
-- **跟踪频率**：每 2 秒读取新增日志，不受任务列表刷新间隔影响。
-- **首次读取**：默认读取文件末尾 256 KiB，之后增量读取；`slurmJobs.logTailKB` 控制单次读取上限。
-- **日志颜色**：默认按级别为完整纯文本行着色：错误红色、警告黄色、成功绿色、信息青色、调试灰色；通过 `slurmJobs.outputColors` 可关闭。程序自带的 ANSI 颜色原样保留；未完成的行和进度条立即显示，不额外着色。
-- **换行和进度条**：保留 ANSI 和 `\r` 回车刷新，将普通 LF 转换为终端 CRLF，避免阶梯状换行。
-- **原生交互**：支持终端的选择、复制、查找、滚动和折行。显示保留行数由 `terminal.integrated.scrollback` 控制。
-- **暂停与继续**：选中日志终端，从命令面板执行 **Pause Current Output / Resume Current Output**；各标签独立暂停。
-- **清空显示**：执行 **Clear Current Output**，不会修改日志文件；后续继续追加新输出。
-
-日志终端通过扩展直接读取文件，不启动 Shell，也不接受输入执行命令。文件截断或替换后会重新读取；路径已知但文件尚未生成或暂不可读时自动重试。
+文件尚未生成或无法读取时显示错误；生成后再次点击打开。日志必须在当前扩展运行的主机上可访问；Remote-SSH 下会打开远端文件。
 
 ### 历史任务日志
 
 打开历史任务的输出时，扩展会按需查询 Slurm 记账中保存的 `StdOut` / `StdErr`、`WorkDir` 和 `JobIDRaw` 等字段，解析日志路径，并支持数组任务文件名。
 
-**路径缺失时仅提示，跳过日志跟踪，不弹出文件选择框。** 路径存在时，文件仍须保留在远端主机可访问的位置，并允许当前 SSH 用户读取。旧版本 Slurm 未提供日志路径字段时，历史列表和详情仍可正常使用。
+**路径缺失时仅提示，跳过文件打开，不弹出文件选择框。** 路径存在时，文件仍须保留在远端主机可访问的位置，并允许当前 SSH 用户读取。旧版本 Slurm 未提供日志路径字段时，历史列表和详情仍可正常使用。
 
 控制器明确返回空的 stderr 路径时，使用合并后的 stdout。支持 `%j`、`%A`、`%a`、`%x`、`%u` 和数字补零；需要节点或任务上下文的模板（如 `%N`、`%t`）可能无法解析。
 
@@ -91,7 +90,7 @@ Slurm 14091 · stderr
 
 在任务视图的更多操作菜单或命令面板运行 **Slurm: Change Interface Language**，选择跟随 VS Code、简体中文或英文。默认中文编辑器使用简体中文，其他语言使用英文。
 
-手动语言设置作用于任务树、详情和扩展提示；原生命令、菜单、设置与终端交互界面使用 VS Code 的显示语言。Slurm 字段、状态码、任务数据和日志正文保持原文。
+手动语言设置作用于任务树、详情和扩展提示；原生命令、菜单、设置与编辑器界面使用 VS Code 的显示语言。Slurm 字段、状态码、任务数据和日志正文保持原文。
 
 建议在 **Remote Settings** 中配置：
 
@@ -102,9 +101,7 @@ Slurm 14091 · stderr
   "slurmJobs.binDirectory": "",
   "slurmJobs.refreshSeconds": 30,
   "slurmJobs.timeoutSeconds": 20,
-  "slurmJobs.historyDays": 7,
-  "slurmJobs.logTailKB": 256,
-  "slurmJobs.outputColors": true
+  "slurmJobs.historyDays": 7
 }
 ```
 
@@ -113,11 +110,9 @@ Slurm 14091 · stderr
 | `slurmJobs.language` | `auto` | `auto` 跟随 VS Code；`zh-cn` 简体中文；`en` 英文 |
 | `slurmJobs.user` | 空字符串 | 使用远端系统用户；`*` 查询所有用户；也可指定用户名 |
 | `slurmJobs.binDirectory` | 空字符串 | Slurm 命令所在绝对目录；留空使用扩展进程的 PATH |
-| `slurmJobs.refreshSeconds` | `30` | 可见任务、分区、节点视图刷新间隔，0–3600 秒；`0` 关闭视图和历史自动刷新，不影响日志跟踪 |
+| `slurmJobs.refreshSeconds` | `30` | 可见任务、分区、节点视图刷新间隔，0–3600 秒；`0` 关闭视图和历史自动刷新，不影响编辑器文件更新 |
 | `slurmJobs.timeoutSeconds` | `20` | 单条 Slurm 查询超时，2–120 秒 |
 | `slurmJobs.historyDays` | `7` | 历史及记账查找窗口，1–365 天 |
-| `slurmJobs.outputColors` | `true` | 按日志级别为完整纯文本行自动着色；关闭后仍保留程序自带的 ANSI 颜色 |
-| `slurmJobs.logTailKB` | `256` | 单次日志读取上限，4–4096 KiB；显示保留行数使用原生终端设置 |
 
 ## 命令速查
 
@@ -135,19 +130,16 @@ Slurm 14091 · stderr
 | Show Job History | 定位、展开并刷新历史分组 |
 | Find Job by ID | 按 ID 查询任务 |
 | Show Job Details | 查看任务详情 |
-| Follow Standard Output | 在原生终端标签中跟踪 stdout |
-| Follow Standard Error | 在原生终端标签中跟踪 stderr |
-| Pause Current Output | 暂停当前选中的日志终端 |
-| Resume Current Output | 继续当前选中的日志终端 |
-| Clear Current Output | 清空当前日志终端显示 |
+| Open Standard Output File | 在文件编辑器中打开 stdout |
+| Open Standard Error File | 在文件编辑器中打开 stderr |
 | Copy Job ID | 复制任务 ID |
 | Show Query Output | 查看查询命令和诊断 |
 
 ## 常见问题与限制
 
 - **找不到 Slurm 命令**：扩展不会加载交互式 Shell 初始化文件。若 Slurm 需 `module load`，请设置 `binDirectory`，并确保扩展进程具有所需环境和库路径。
-- **任务可见但日志不可读**：任务查询权限与文件读取权限分别生效。仅位于计算节点本地磁盘的日志，无法从登录节点直接跟踪。
-- **日志更新慢**：扩展只能读取程序已写入文件的内容。Python 任务可使用 `python -u` 减少输出缓冲造成的延迟。
+- **任务可见但日志不可读**：任务查询权限与文件读取权限分别生效。仅位于计算节点本地磁盘的日志，无法从登录节点直接打开。
+- **日志更新慢**：编辑器只能显示程序已写入文件的内容。Python 任务可使用 `python -u` 减少输出缓冲造成的延迟。
 - **资源使用率**：CPU、GPU、内存等字段表示申请或分配情况；当前不提供实时 GPU 利用率、显存曲线或 step 级实际内存峰值汇总。
 - 当前查询默认集群，不提供联合集群切换；扩展仅在受信任工作区启用。
 

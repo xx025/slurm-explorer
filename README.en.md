@@ -2,7 +2,7 @@
 
 [简体中文](README.md) · [VS Code Marketplace](https://marketplace.visualstudio.com/items?itemName=xx025.slurm-job-viewer)
 
-View active Slurm jobs, accounting history, partitions and node resources in VS Code, and follow logs in **native terminal tabs**. Supports English and Simplified Chinese. Use it through Remote-SSH on a Slurm login node, or locally on Linux with Slurm clients installed.
+View active Slurm jobs, accounting history, partitions and node resources in VS Code, and open logs in **file editor tabs**. Supports English and Simplified Chinese. Use it through Remote-SSH on a Slurm login node, or locally on Linux with Slurm clients installed.
 
 ## Install and update
 
@@ -57,33 +57,32 @@ A persistent, expandable **History** group appears below active jobs. Expanding 
 
 History comes from `sacct` allocation records. Disabled accounting, insufficient permissions or purged records can produce empty results or query errors.
 
-## Native terminal log tabs
+## File editor logs
 
-Use a job's output icon or the **Open stdout / Open stderr** buttons in its details to open a native tab in the bottom **Terminal** panel:
+Use a job's output icon or the **Open stdout / Open stderr** buttons in its details to open the actual log file in the VS Code editor. Logs use persistent tabs rather than preview tabs. Opening the same file reuses its document; stderr merged into stdout opens the same file.
 
-```text
-Slurm 14115 · stdout
-Slurm 14091 · stdout
-Slurm 14091 · stderr
+- Use native editor search, selection, copy, wrapping and split views. File contents remain unchanged without generated color escapes.
+- VS Code handles external file changes. The extension no longer polls logs or provides terminal auto-scroll, pause or clear actions. The editor opens the full file; VS Code handles large-file limits.
+- For highlighting, install **Log File Highlighter** (`emilast.LogFileHighlighter`). For `.out` / `.err` files, select **Log** in the status-bar language selector or configure filename associations:
+
+```json
+{
+  "files.associations": {
+    "slurm-*.out": "log",
+    "slurm-*.err": "log"
+  }
+}
 ```
 
-Different jobs and output streams retain separate tabs and independent followers. Reopening the same output reuses its tab. Use the native terminal tab list to switch, rename or close tabs. Closing a tab stops only that log follower and does not cancel the Slurm job. If the list is hidden, enable **Terminal › Integrated › Tabs: Enabled** in settings.
+Add patterns for custom log filenames as needed. Slurm Explorer does not install other extensions or change file associations automatically.
 
-- **Follow interval:** read new content every 2 seconds, independently of queue refresh.
-- **Initial read:** tail up to 256 KiB by default, then read increments. `slurmJobs.logTailKB` limits each read.
-- **Log colors:** complete plain lines are colored by level: errors red, warnings yellow, success green, info cyan and debug gray. Disable this with `slurmJobs.outputColors`. Original ANSI colors pass through unchanged; partial lines and progress updates display immediately without added colors.
-- **Line breaks and progress:** preserve ANSI and `\r` progress updates; normalize bare LF to terminal CRLF to avoid staircase line breaks.
-- **Native interaction:** use terminal selection, copy, find, scrolling and reflow. `terminal.integrated.scrollback` controls retained display lines.
-- **Pause and resume:** select a log terminal and run **Pause Current Output / Resume Current Output** from the command palette. Tabs pause independently.
-- **Clear display:** run **Clear Current Output** without modifying the log file. Future output continues to append.
-
-The extension reads files directly without starting a shell or executing terminal input. Truncation and replacement restart reading. Known paths that do not exist yet, or are temporarily unreadable, retry automatically.
+Missing or unreadable files show an error. Open again once the file is available. Files must be accessible from the extension host; Remote-SSH opens remote files.
 
 ### Historical job logs
 
 Opening historical output queries accounting on demand for retained fields such as `StdOut` / `StdErr`, `WorkDir` and `JobIDRaw`, resolves the path and supports array-job filename patterns.
 
-**Missing paths are reported and log following is skipped without a file picker.** When a path exists, the file must still be present on a filesystem accessible from the remote host and readable by the SSH user. Older Slurm versions without log path fields can still display normal history and details.
+**Missing paths are reported and opening is skipped without a file picker.** When a path exists, the file must still be present on a filesystem accessible from the remote host and readable by the SSH user. Older Slurm versions without log path fields can still display normal history and details.
 
 An explicitly empty controller stderr path uses the merged stdout file. Supported patterns include `%j`, `%A`, `%a`, `%x`, `%u` and numeric padding. Patterns requiring node or task context, such as `%N` or `%t`, may remain unresolved.
 
@@ -91,7 +90,7 @@ An explicitly empty controller stderr path uses the merged stdout file. Supporte
 
 Run **Slurm: Change Interface Language** from the command palette or the job view's More Actions menu to select Follow VS Code, Simplified Chinese or English. Chinese editor locales default to Simplified Chinese; other locales default to English.
 
-The manual language setting applies to the tree, details and extension messages. Native commands, menus, settings and terminal interactions follow VS Code's display language. Slurm fields, state codes, job data and log contents retain their original text.
+The manual language setting applies to the tree, details and extension messages. Native commands, menus, settings and editor interactions follow VS Code's display language. Slurm fields, state codes, job data and log contents retain their original text.
 
 Configure these in **Remote Settings**:
 
@@ -102,9 +101,7 @@ Configure these in **Remote Settings**:
   "slurmJobs.binDirectory": "",
   "slurmJobs.refreshSeconds": 30,
   "slurmJobs.timeoutSeconds": 20,
-  "slurmJobs.historyDays": 7,
-  "slurmJobs.logTailKB": 256,
-  "slurmJobs.outputColors": true
+  "slurmJobs.historyDays": 7
 }
 ```
 
@@ -113,11 +110,9 @@ Configure these in **Remote Settings**:
 | `slurmJobs.language` | `auto` | `auto` follows VS Code; `zh-cn` selects Simplified Chinese; `en` selects English |
 | `slurmJobs.user` | Empty | Remote OS user; `*` selects all users; a username selects that user |
 | `slurmJobs.binDirectory` | Empty | Absolute directory containing Slurm commands; empty uses the extension host PATH |
-| `slurmJobs.refreshSeconds` | `30` | Visible job / partition / node view refresh interval, 0–3600 seconds; `0` disables view / history auto-refresh without affecting log followers |
+| `slurmJobs.refreshSeconds` | `30` | Visible job / partition / node view refresh interval, 0–3600 seconds; `0` disables view / history auto-refresh without affecting editor file updates |
 | `slurmJobs.timeoutSeconds` | `20` | Timeout per Slurm query, 2–120 seconds |
 | `slurmJobs.historyDays` | `7` | Accounting history and lookup window, 1–365 days |
-| `slurmJobs.outputColors` | `true` | Automatically color complete plain log lines by level; original ANSI colors remain when disabled |
-| `slurmJobs.logTailKB` | `256` | Maximum per log read, 4–4096 KiB; display retention uses native terminal settings |
 
 ## Command reference
 
@@ -135,19 +130,16 @@ Press `Ctrl+Shift+P` and search for `Slurm`. Names below are English; Chinese VS
 | Show Job History | Locate, expand and refresh sidebar history |
 | Find Job by ID | Look up a job by ID |
 | Show Job Details | Open job details |
-| Follow Standard Output | Follow stdout in a native terminal tab |
-| Follow Standard Error | Follow stderr in a native terminal tab |
-| Pause Current Output | Pause the selected log terminal |
-| Resume Current Output | Resume the selected log terminal |
-| Clear Current Output | Clear the selected log terminal display |
+| Open Standard Output File | Open stdout in the file editor |
+| Open Standard Error File | Open stderr in the file editor |
 | Copy Job ID | Copy a job ID |
 | Show Query Output | View query commands and diagnostics |
 
 ## Troubleshooting and limitations
 
 - **Slurm commands are not found:** the extension does not load interactive shell initialization scripts. If Slurm requires `module load`, configure `binDirectory` and provide the extension process with the required environment and library paths.
-- **Jobs are visible but logs are unreadable:** scheduler visibility and file access are separate permissions. Logs stored only on a compute node's local disk cannot be followed directly from the login node.
-- **Delayed logs:** the extension reads only content the application has written to the file. Python jobs can use `python -u` to reduce buffering delays.
+- **Jobs are visible but logs are unreadable:** scheduler visibility and file access are separate permissions. Logs stored only on a compute node's local disk cannot be opened directly from the login node.
+- **Delayed logs:** the editor can only display content the application has written to the file. Python jobs can use `python -u` to reduce buffering delays.
 - **Resource utilization:** CPU, GPU and memory fields describe requests or allocations. Live GPU utilization, VRAM charts and job-step actual memory peak aggregation are not included.
 - The extension queries the default cluster, does not offer federated cluster selection, and requires a trusted workspace.
 

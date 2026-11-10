@@ -228,9 +228,7 @@ export function activate(context: vscode.ExtensionContext): void {
   const tree = new JobTree(client);
   const view = vscode.window.createTreeView("slurmJobs", { treeDataProvider: tree, showCollapseAll: true });
   const cluster = new ClusterViews(client, t, language, message);
-  const jobOutput = new JobOutput(t, message,
-    () => config().get<number>("logTailKB", 256) * 1024,
-    () => config().get<boolean>("outputColors", true));
+  const jobOutput = new JobOutput();
   const panels = new Map<string, vscode.WebviewPanel>();
   const panelDetails = new Map<string, JobDetails>();
   let pendingRefresh: Promise<void> | undefined;
@@ -288,7 +286,7 @@ export function activate(context: vscode.ExtensionContext): void {
     const request = ++logRequest;
     const details = await client.logDetails(id, known);
     if (disposed) { return; }
-    await jobOutput.follow(details, stream, request === logRequest);
+    await jobOutput.open(details, stream, () => request === logRequest);
   }
 
   async function showDetails(id: string, known?: JobDetails): Promise<void> {
@@ -333,9 +331,6 @@ export function activate(context: vscode.ExtensionContext): void {
     await Promise.all([refresh(), tree.refreshHistory(true), cluster.refreshVisible()]);
   });
   register("slurm.output", () => output.show());
-  register("slurm.pauseOutput", () => jobOutput.pause(true));
-  register("slurm.resumeOutput", () => jobOutput.pause(false));
-  register("slurm.clearOutput", () => jobOutput.clear());
   register("slurm.selectUser", async () => {
     const ownUser = os.userInfo().username;
     const configured = config().get<string>("user", "").trim();

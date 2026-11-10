@@ -12,7 +12,7 @@ function harness(initialGate) {
   const state = {
     values: { refreshSeconds: 0 }, configurationListeners: [], commands: new Map(),
     selections: [], inputs: [], queries: [], panels: [], errors: [],
-    historyQueries: [], quickPickCalls: 0, executed: [], revealed: [], terminals: [],
+    historyQueries: [], quickPickCalls: 0, executed: [], revealed: [], terminals: [], documents: new Map(), editors: [],
     views: new Map(), resourceQueries: []
   };
   class EventEmitter {
@@ -45,6 +45,7 @@ function harness(initialGate) {
     }
   };
   const api = {
+    Uri: { file: filename => ({ fsPath: filename, scheme: "file" }) },
     EventEmitter,
     TreeItem: class { constructor(label) { this.label = label; } },
     ThemeIcon: class {},
@@ -55,6 +56,14 @@ function harness(initialGate) {
     env: { language: "en", clipboard: { writeText: async () => {} } },
     workspace: {
       getConfiguration: () => configuration,
+      openTextDocument: async uri => {
+        if (state.documentGate) { await state.documentGate(uri); }
+        if (!state.documents.has(uri.fsPath)) {
+          const text = await fs.promises.readFile(uri.fsPath, "utf8");
+          state.documents.set(uri.fsPath, { uri, getText: () => text });
+        }
+        return state.documents.get(uri.fsPath);
+      },
       textDocuments: [],
       registerTextDocumentContentProvider: () => disposable(),
       onDidCloseTextDocument: () => disposable(),
@@ -64,6 +73,10 @@ function harness(initialGate) {
       }
     },
     window: {
+      showTextDocument: async (document, options) => {
+        state.editors.push({ document, options });
+        return { document };
+      },
       createTerminal: options => {
         let opened = false, closed = false;
         const terminal = { name: options.name, text: "", pty: options.pty,
@@ -196,67 +209,50 @@ test("extension user selection and language commands update real providers and o
   } finally { app.dispose(); }
 });
 
-test("native terminal tabs retain separate task streams, deduplicate and pause independently", async () => {
+test("logs open actual files in persistent editor tabs, reusing documents and preserving bytes", async () => {
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), "slurm-output-"));
-  const filename = path.join(directory, "job.log");
-  fs.writeFileSync(filename, "epoch 1\n");
+  const filename = path.join(directory, "job #1.log");
+  const stderr = path.join(directory, "error.err");
+  const text = "INFO starting\n\x1b[31mERROR failed\x1b[0m\n";
+  fs.writeFileSync(filename, text);
+  fs.writeFileSync(stderr, "failure\n");
   const app = harness();
   try {
     app.logFile = filename;
     await app.run("slurm.stdout", "42");
-    assert.equal(app.terminals.length, 1);
-    const first = app.terminals[0];
-    assert.equal(first.name, "Slurm 42 · stdout");
-    assert.match(first.text, /epoch 1\r\n$/);
-    await app.run("slurm.pauseOutput");
-    fs.appendFileSync(filename, "epoch 2\n");
-    await app.run("slurm.stdout", "43");
-    assert.equal(app.terminals.length, 2);
-    const second = app.terminals[1];
-    assert.doesNotMatch(first.text, /epoch 2/);
-    assert.match(second.text, /epoch 1\r\nepoch 2\r\n$/);
+    const first = app.editors[0];
+    assert.equal(first.document.uri.fsPath, filename);
+    assert.equal(first.document.uri.scheme, "file");
+    assert.equal(first.document.getText(), text);
+    assert.deepEqual(first.options, { preview: false });
     await app.run("slurm.stdout", "42");
-    assert.equal(app.terminals.length, 2);
-    assert.doesNotMatch(first.text, /epoch 2/);
-    await app.run("slurm.resumeOutput");
-    await settle();
-    await app.run("slurm.stdout", "42");
-    assert.match(first.text, /epoch 2\r\n$/);
+    assert.equal(app.editors[1].document, first.document);
     await app.run("slurm.stderr", "42");
-    assert.equal(app.terminals.length, 3);
-    assert.equal(app.terminals[2].name, "Slurm 42 · stderr");
-    await app.run("slurm.clearOutput");
-    assert.ok(app.terminals[2].text.endsWith("\x1b[2J\x1b[3J\x1b[H"));
-    first.dispose();
-    fs.appendFileSync(filename, "epoch 3\n");
-    const snapshot = first.text;
-    await app.run("slurm.stdout", "42");
-    assert.equal(app.terminals.length, 4);
-    assert.equal(first.text, snapshot);
-    assert.match(app.terminals[3].text, /epoch 3\r\n$/);
+    assert.equal(app.editors[2].document, first.document); // merged stderr
+    app.detailsHandler = async id => ({id, source:"scontrol", fields:{StdOut:filename,StdErr:stderr},raw:""});
+    await app.run("slurm.stderr", "43");
+    assert.equal(app.editors[3].document.uri.fsPath, stderr);
+    assert.equal(app.terminals.length, 0);
+    for (const command of ["slurm.pauseOutput", "slurm.resumeOutput", "slurm.clearOutput"]) {
+      assert.equal(app.commands.has(command), false);
+    }
     assert.deepEqual(app.errors, []);
-  } finally { app.dispose(); fs.rmSync(directory, {recursive:true}); }
+  } finally { app.dispose(); fs.rmSync(directory, { recursive: true }); }
 });
 
-test("output colors apply to native log tabs and the setting takes effect without reopening", async () => {
-  const directory = fs.mkdtempSync(path.join(os.tmpdir(), "slurm-colors-"));
-  const filename = path.join(directory, "job.log");
-  fs.writeFileSync(filename, "INFO starting\nERROR failed\n");
+test("missing and non-regular logs report errors without opening an editor", async () => {
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), "slurm-invalid-log-"));
   const app = harness();
   try {
-    app.logFile = filename;
+    app.logFile = path.join(directory, "missing.out");
     await app.run("slurm.stdout", "42");
-    const terminal = app.terminals[0];
-    assert.match(terminal.text, /\x1b\[36mINFO starting\x1b\[39m\r\n/);
-    assert.match(terminal.text, /\x1b\[31mERROR failed\x1b\[39m\r\n$/);
-    app.values.outputColors = false;
-    fs.appendFileSync(filename, "WARNING plain\n");
+    assert.match(app.errors[0], /ENOENT/);
+    app.logFile = directory;
     await app.run("slurm.stdout", "42");
-    assert.ok(terminal.text.endsWith("\r\nWARNING plain\r\n"));
-    fs.appendFileSync(filename, "\x1b[35mcustom\x1b[0m\n");
-    await app.run("slurm.stdout", "42");
-    assert.ok(terminal.text.endsWith("\x1b[35mcustom\x1b[0m\r\n"));
-  } finally { app.dispose(); fs.rmSync(directory, {recursive:true}); }
+    assert.match(app.errors[1], /regular files/);
+    assert.equal(app.editors.length, 0);
+    assert.equal(app.terminals.length, 0);
+  } finally { app.dispose(); fs.rmSync(directory, { recursive: true }); }
 });
 
 test("partition and node views show independent resources and refresh localized details", async () => {
@@ -351,7 +347,7 @@ test("resource reads deduplicate and reset ignores results from the previous bin
   } finally { app.dispose(); }
 });
 
-test("history output enriches known accounting metadata before opening a native tab", async () => {
+test("history output enriches known accounting metadata before opening a file", async () => {
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), "slurm-history-log-"));
   const filename = path.join(directory, "history.log");
   fs.writeFileSync(filename, "finished\n");
@@ -363,37 +359,49 @@ test("history output enriches known accounting metadata before opening a native 
       return {...details, fields: {...details.fields, StdOut:filename}};
     };
     await app.run("slurm.stdout", {kind:"historyJob", details:known});
-    assert.match(app.terminals[0].text, /finished\r\n$/);
+    assert.equal(app.editors[0].document.getText(), "finished\n");
     app.logDetailsHandler = async (_id, details) => details;
     await app.run("slurm.stdout", {kind:"historyJob", details:app.historyData[1]});
-    assert.equal(app.terminals.length, 1);
+    assert.equal(app.editors.length, 1);
     assert.match(app.errors[0], /did not retain a log path/);
   } finally { app.dispose(); fs.rmSync(directory,{recursive:true}); }
 });
 
-test("concurrent log lookups keep both native tabs without stealing focus from the latest click", async () => {
-  const directory = fs.mkdtempSync(path.join(os.tmpdir(), "slurm-native-switch-"));
-  const filename = path.join(directory,"job.log");
-  fs.writeFileSync(filename,"output\n");
+test("a slower document open cannot steal focus from the latest click", async () => {
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), "slurm-editor-switch-"));
+  const firstFile = path.join(directory, "first.out");
+  const secondFile = path.join(directory, "second.out");
+  fs.writeFileSync(firstFile, "first\n"); fs.writeFileSync(secondFile, "second\n");
   const app = harness();
-  let release;
+  let release, entered;
+  const started = new Promise(resolve => { entered = resolve; });
+  const gate = new Promise(resolve => { release = resolve; });
   try {
-    app.logDetailsHandler = id => id === "42" ? new Promise(resolve => { release = resolve; })
-      : Promise.resolve({id,source:"scontrol",fields:{StdOut:filename},raw:""});
-    const first = app.run("slurm.stdout","42");
-    await settle();
-    await app.run("slurm.stdout","43");
-    release({id:"42",source:"scontrol",fields:{StdOut:filename},raw:""});
-    await first;
-    app.logDetailsHandler = async id => ({id,source:"scontrol",fields:{StdOut:filename},raw:""});
-    assert.deepEqual(app.terminals.map(terminal=>terminal.name),["Slurm 43 · stdout","Slurm 42 · stdout"]);
-    await app.run("slurm.pauseOutput");
-    fs.appendFileSync(filename,"more\n");
-    await app.run("slurm.stdout","43");
-    assert.doesNotMatch(app.terminals[0].text,/more/);
-    await app.run("slurm.stdout","42");
-    assert.match(app.terminals[1].text,/more\r\n$/);
-  } finally { app.dispose(); fs.rmSync(directory,{recursive:true}); }
+    app.detailsHandler = async id => ({id,source:"scontrol",fields:{StdOut:id === "42" ? firstFile : secondFile},raw:""});
+    app.documentGate = async uri => { if (uri.fsPath === firstFile) { entered(); await gate; } };
+    const first = app.run("slurm.stdout", "42");
+    await started;
+    await app.run("slurm.stdout", "43");
+    release(); await first;
+    assert.deepEqual(app.editors.map(editor => editor.document.uri.fsPath), [secondFile]);
+    assert.deepEqual(app.errors, []);
+  } finally { release(); app.dispose(); fs.rmSync(directory, {recursive:true}); }
+});
+
+test("disposing the extension while a file opens prevents a late editor", async () => {
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), "slurm-editor-close-"));
+  const filename = path.join(directory, "job.out"); fs.writeFileSync(filename, "output\n");
+  const app = harness();
+  let release, entered;
+  const started = new Promise(resolve => { entered = resolve; });
+  const gate = new Promise(resolve => { release = resolve; });
+  try {
+    app.logFile = filename;
+    app.documentGate = async () => { entered(); await gate; };
+    const pending = app.run("slurm.stdout", "42");
+    await started; app.dispose(); release(); await pending;
+    assert.equal(app.editors.length, 0);
+  } finally { release(); fs.rmSync(directory, {recursive:true}); }
 });
 
 test("a pending own-user query cannot replace results after switching to all users", async () => {

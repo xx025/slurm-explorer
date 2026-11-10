@@ -2,7 +2,7 @@
   "name": "slurm-job-viewer",
   "displayName": "Slurm Explorer",
   "description": "%extension.description%",
-  "version": "0.6.1",
+  "version": "0.6.2",
   "publisher": "xx025",
   "license": "MIT",
   "engines": {
@@ -85,21 +85,6 @@
         "command": "slurm.language",
         "title": "%command.language%",
         "icon": "$(globe)"
-      },
-      {
-        "command": "slurm.pauseOutput",
-        "title": "%command.pauseOutput%",
-        "icon": "$(debug-pause)"
-      },
-      {
-        "command": "slurm.resumeOutput",
-        "title": "%command.resumeOutput%",
-        "icon": "$(play)"
-      },
-      {
-        "command": "slurm.clearOutput",
-        "title": "%command.clearOutput%",
-        "icon": "$(clear-all)"
       },
       {
         "command": "slurm.refreshPartitions",
@@ -242,13 +227,6 @@
           "maximum": 365,
           "description": "%config.historyDays%"
         },
-        "slurmJobs.logTailKB": {
-          "type": "integer",
-          "default": 256,
-          "minimum": 4,
-          "maximum": 4096,
-          "description": "%config.logTailKB%"
-        },
         "slurmJobs.language": {
           "type": "string",
           "default": "auto",
@@ -263,11 +241,6 @@
             "%language.zh%",
             "%language.en%"
           ]
-        },
-        "slurmJobs.outputColors": {
-          "type": "boolean",
-          "default": true,
-          "description": "%config.outputColors%"
         }
       }
     }
