@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.6.5
+
+- Add Slurm icons to partition and node detail tabs, matching job details with light and dark theme variants.
+
 ## 0.6.4
 
 - Persist resolved stdout / stderr paths and complete Slurm batch scripts across extension restarts; never copy log contents into the cache.

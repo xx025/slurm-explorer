@@ -230,7 +230,7 @@ export function activate(context: vscode.ExtensionContext): void {
   const client = new SlurmClient(settings, text => output.appendLine(`[${new Date().toISOString()}] ${text}`));
   const tree = new JobTree(client);
   const view = vscode.window.createTreeView("slurmJobs", { treeDataProvider: tree, showCollapseAll: true });
-  const cluster = new ClusterViews(client, t, language, message);
+  const cluster = new ClusterViews(client, t, language, message, context.extensionUri);
   const jobOutput = new JobOutput();
   const cacheEnabled = () => config().get<boolean>("cacheEnabled", true);
   const cache = new JobCache(path.join(context.globalStorageUri.fsPath, "job-cache"),

@@ -90,7 +90,7 @@ An explicitly empty controller stderr path uses the merged stdout file. Supporte
 
 Select **View batch script** in job details, right-click an active or historical job and choose **View Batch Script**, or run **Slurm: View Batch Script** from the command palette and enter a job ID.
 
-The extension uses `scontrol write batch_script <job_id> -` to retrieve the controller-stored submission script and opens it in a read-only `slurm-<job_id>.sh` editor tab. It never executes the script or reads / overwrites a later-edited working copy. Reopening fetches the snapshot again and reuses the same tab. Job detail tabs use a Slurm icon with light and dark theme variants.
+The extension uses `scontrol write batch_script <job_id> -` to retrieve the controller-stored submission script and opens it in a read-only `slurm-<job_id>.sh` editor tab. It never executes the script or reads / overwrites a later-edited working copy. Reopening fetches the snapshot again and reuses the same tab. Job, partition and node detail tabs use a Slurm icon with light and dark theme variants.
 
 This is the script submitted to Slurm. If a submission tool rendered a template first, its rendered content appears here. Shell variables, command substitutions and runtime-generated commands remain unexpanded.
 

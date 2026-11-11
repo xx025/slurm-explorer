@@ -179,7 +179,7 @@ export class ClusterViews implements vscode.Disposable {
   private disposed = false;
 
   constructor(client: SlurmClient, private readonly t: Translator, private readonly language: () => string,
-    private readonly message: (error: unknown) => string) {
+    private readonly message: (error: unknown) => string, private readonly extensionUri: vscode.Uri) {
     this.trees = (["partition", "node"] as const).map(kind =>
       new ResourceTree(kind, () => client.resources(kind), t, message));
     for (const tree of this.trees) {
@@ -201,6 +201,10 @@ export class ClusterViews implements vscode.Disposable {
     if (existing) { existing.panel.reveal(); return; }
     const panel = vscode.window.createWebviewPanel("slurmResourceDetails", `Slurm · ${resource.name}`,
       vscode.ViewColumn.Active, { enableScripts: true, localResourceRoots: [] });
+    panel.iconPath = {
+      light: vscode.Uri.joinPath(this.extensionUri, "media", "slurm-light.svg"),
+      dark: vscode.Uri.joinPath(this.extensionUri, "media", "slurm.svg")
+    };
     const entry = { panel, resource };
     this.panels.set(key, entry);
     panel.webview.html = renderResource(resource, this.t, this.language());

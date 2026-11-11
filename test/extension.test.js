@@ -318,6 +318,15 @@ test("partition and node views show independent resources and refresh localized 
     await app.run("slurm.selectUser");
     assert.equal(partitions.tree.records[0].name, "gpu");
     assert.equal(nodes.tree.records[0].name, "gpu01");
+    await app.run("slurm.resourceDetails", partition);
+    assert.equal(app.panels.length, 2);
+    for (const resourcePanel of app.panels) {
+      assert.equal(path.basename(resourcePanel.iconPath.light.fsPath), "slurm-light.svg");
+      assert.equal(path.basename(resourcePanel.iconPath.dark.fsPath), "slurm.svg");
+      for (const icon of [resourcePanel.iconPath.light, resourcePanel.iconPath.dark]) {
+        assert.ok(fs.existsSync(icon.fsPath));
+      }
+    }
     assert.deepEqual(app.errors, []);
   } finally { app.dispose(); }
 });
