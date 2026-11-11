@@ -1,6 +1,6 @@
 # Slurm Explorer
 
-[简体中文](README.zh-CN.md) · [VS Code Marketplace](https://marketplace.visualstudio.com/items?itemName=xx025.slurm-job-viewer)
+[简体中文](README.zh-CN.md) · [VS Code Marketplace](https://marketplace.visualstudio.com/items?itemName=xx025.slurm-explorer)
 
 View active Slurm jobs, accounting history, partitions and node resources in VS Code, and open logs in **file editor tabs**. Supports English and Simplified Chinese. Use it through Remote-SSH on a Slurm login node, or locally on Linux with Slurm clients installed.
 
@@ -9,11 +9,15 @@ View active Slurm jobs, accounting history, partitions and node resources in VS 
 ### Install from the Marketplace
 
 1. Connect to a Slurm login node using **Remote - SSH**.
-2. Press `Ctrl+Shift+X` and search for `@id:xx025.slurm-job-viewer`.
+2. Press `Ctrl+Shift+X` and search for `@id:xx025.slurm-explorer`.
 3. Install **Slurm Explorer** on the **SSH host**. If you see **Install in SSH: ...**, select it.
 4. Open the **Slurm Explorer** cluster outline icon in the activity bar. The remote OS user is selected by default.
 
 Requires VS Code 1.90 or newer. The remote host must be able to run `squeue`, `scontrol` and `sacct`. The extension uses your existing SSH permissions; no additional HTTP service or token is needed.
+
+### Migrate from the old extension ID
+
+Starting with 0.6.6, the extension ID is `xx025.slurm-explorer`. If you installed `xx025.slurm-job-viewer`, disable the old extension, install the new ID on the same host, and open Slurm Explorer once before uninstalling the old extension. Marketplace updates do not move installations between IDs. Existing `slurmJobs.*` settings remain compatible. On first activation with caching enabled, saved log paths and batch scripts are copied from the old extension storage on the same host if the new cache does not already exist. The old cache is retained; log contents are never copied.
 
 ### Update an existing installation
 
@@ -185,6 +189,6 @@ npm run package -- --out ../slurm-explorer.vsix
 
 Open the source directory in VS Code and press F5 to launch the extension development host. For a read-only live check, compile first and run `node test/live-check.cjs` on a login node. The extension has no third-party runtime dependencies.
 
-The project is named **Slurm Explorer**. The extension ID remains `xx025.slurm-job-viewer` to preserve existing installations and updates. `.github/workflows/publish.yml` uses GitHub Actions Trusted Publishing (OIDC). Manual `publish=false` runs validate and package; `publish=true` publishes to the Marketplace. Publishing a GitHub Release also triggers publication; its tag must match the `package.json` version.
+The project and extension are named **Slurm Explorer**, with extension ID `xx025.slurm-explorer`. `.github/workflows/publish.yml` uses GitHub Actions Trusted Publishing (OIDC). Manual `publish=false` runs validate and package; `publish=true` publishes to the Marketplace. Publishing a GitHub Release also triggers publication; its tag must match the `package.json` version.
 
 `media/icon.png` is the Marketplace / extension-list icon, `media/icon.svg` is its editable source, and `media/slurm.svg` is the activity-bar icon.

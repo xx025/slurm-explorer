@@ -38,8 +38,8 @@ jobs:
         run: |
           node <<'JS'
           const manifest = require('./package.json');
-          if (manifest.publisher !== 'xx025') {
-            throw new Error('Expected publisher xx025');
+          if (manifest.publisher !== 'xx025' || manifest.name !== 'slurm-explorer') {
+            throw new Error('Expected extension ID xx025.slurm-explorer');
           }
           if (process.env.RELEASE_TAG && process.env.RELEASE_TAG !== `v${manifest.version}`) {
             throw new Error('Release tag must match the package version');

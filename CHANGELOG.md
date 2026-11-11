@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.6.6
+
+- Change the extension ID to xx025.slurm-explorer to match the project name. Existing users must install the new ID; Marketplace updates do not migrate between IDs.
+- Preserve slurmJobs settings and copy saved log paths and batch scripts from the old extension storage on first activation when the new cache does not exist. Keep the old cache and never copy log contents.
+
 ## 0.6.5
 
 - Add Slurm icons to partition and node detail tabs, matching job details with light and dark theme variants.

@@ -1,6 +1,6 @@
 # Slurm Explorer
 
-[English](README.md) · [VS Code 扩展市场](https://marketplace.visualstudio.com/items?itemName=xx025.slurm-job-viewer)
+[English](README.md) · [VS Code 扩展市场](https://marketplace.visualstudio.com/items?itemName=xx025.slurm-explorer)
 
 在 VS Code 中查看 Slurm 当前任务、历史记录、分区和节点资源，并在**文件编辑器标签**中打开日志。支持简体中文和英文，适用于通过 Remote-SSH 连接 Slurm 登录节点，也可在已安装 Slurm 客户端的 Linux 本机运行。
 
@@ -9,7 +9,7 @@
 ### 从扩展市场安装
 
 1. 使用 **Remote - SSH** 连接 Slurm 登录节点。
-2. 按 `Ctrl+Shift+X` 打开扩展页，搜索 `@id:xx025.slurm-job-viewer`。
+2. 按 `Ctrl+Shift+X` 打开扩展页，搜索 `@id:xx025.slurm-explorer`。
 3. 将 **Slurm Explorer** 安装到 **SSH 主机**；如果显示 **Install in SSH: ...**，点击该按钮。
 4. 点击活动栏的 **Slurm Explorer** 集群线条图标，查看任务。默认使用远端当前系统用户。
 
@@ -22,6 +22,10 @@
 如果更新尚未显示，也可以从 [GitHub Releases](https://github.com/xx025/slurm-explorer/releases/latest) 下载 `.vsix`，在远端窗口执行 **Extensions: Install from VSIX...** 安装。仓库和发布附件均可公开访问。
 
 任务视图的 **↻** 只刷新任务数据，不检查扩展版本更新。
+
+### 从旧扩展 ID 迁移
+
+从 0.6.6 起，扩展 ID 为 `xx025.slurm-explorer`。已安装 `xx025.slurm-job-viewer` 的用户，请先禁用旧扩展，在同一主机安装新 ID 并打开一次 Slurm Explorer，再卸载旧扩展。市场更新不会自动跨 ID 迁移。现有 `slurmJobs.*` 设置继续生效。首次启动且启用缓存时，如果新缓存尚不存在，会复制同一主机上旧扩展保存的日志路径和完整脚本；保留旧缓存，不复制日志内容。
 
 ## 当前任务与用户范围
 
@@ -185,6 +189,6 @@ npm run package -- --out ../slurm-explorer.vsix
 
 在 VS Code 打开源码目录，按 F5 启动扩展开发窗口。真实集群只读检查可先编译，再在登录节点运行 `node test/live-check.cjs`。扩展运行时没有第三方依赖。
 
-项目已更名为 **Slurm Explorer**，扩展 ID 继续使用 `xx025.slurm-job-viewer`，保留现有安装和更新路径。`.github/workflows/publish.yml` 使用 GitHub Actions Trusted Publishing（OIDC）发布：手动运行 `publish=false` 只检查和打包，`publish=true` 发布到市场；发布 GitHub Release 也会触发，标签必须与 `package.json` 的版本一致。
+项目和扩展名称为 **Slurm Explorer**，扩展 ID 为 `xx025.slurm-explorer`。`.github/workflows/publish.yml` 使用 GitHub Actions Trusted Publishing（OIDC）发布：手动运行 `publish=false` 只检查和打包，`publish=true` 发布到市场；发布 GitHub Release 也会触发，标签必须与 `package.json` 的版本一致。
 
 `media/icon.png` 用于扩展市场和扩展列表，`media/icon.svg` 为可编辑源文件；`media/slurm.svg` 用于活动栏。

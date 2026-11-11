@@ -1,8 +1,8 @@
 {
-  "name": "slurm-job-viewer",
+  "name": "slurm-explorer",
   "displayName": "Slurm Explorer",
   "description": "%extension.description%",
-  "version": "0.6.5",
+  "version": "0.6.6",
   "publisher": "xx025",
   "license": "MIT",
   "engines": {

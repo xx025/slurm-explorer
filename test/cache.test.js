@@ -10,6 +10,35 @@ const fixture = async action => {
   try { await action(root); } finally { await fs.rm(root,{recursive:true,force:true}); }
 };
 
+test("extension ID migration copies paths and scripts before reads and preserves the old cache", () => fixture(async root => {
+  const oldRoot=path.join(root,"xx025.slurm-job-viewer","job-cache");
+  const newRoot=path.join(root,"xx025.slurm-explorer","job-cache");
+  const oldCache=new JobCache(oldRoot,()=>"host",()=>1024*1024);
+  await oldCache.remember(details("42"));
+  await oldCache.saveScript("42","#!/bin/bash\necho migration\n");
+  const migrated=new JobCache(newRoot,()=>"host",()=>1024*1024,undefined,oldRoot);
+  assert.equal((await migrated.get("42")).items.stdout.source,"/shared/slurm-42.out");
+  assert.equal((await migrated.script("42")).text,"#!/bin/bash\necho migration\n");
+  assert.equal((await oldCache.script("42")).text,"#!/bin/bash\necho migration\n");
+  for (const file of await fs.readdir(path.join(newRoot,migrated.namespace()))) {
+    assert.equal((await fs.stat(path.join(newRoot,migrated.namespace(),file))).mode&0o777,0o600);
+  }
+  await migrated.clear();
+  const restarted=new JobCache(newRoot,()=>"host",()=>1024*1024,undefined,oldRoot);
+  assert.equal(await restarted.get("42"),undefined,"cleared snapshots must not return after restart");
+}));
+
+test("extension ID migration keeps a new cache and permits writes when the old cache is missing", () => fixture(async root => {
+  const oldRoot=path.join(root,"old");
+  const newRoot=path.join(root,"new");
+  const fresh=new JobCache(newRoot,()=>"host",()=>1024*1024,undefined,oldRoot);
+  await fresh.saveScript("42","new script");
+  const legacy=new JobCache(oldRoot,()=>"host",()=>1024*1024);
+  await legacy.saveScript("42","old script");
+  const restarted=new JobCache(newRoot,()=>"host",()=>1024*1024,undefined,oldRoot);
+  assert.equal((await restarted.script("42")).text,"new script");
+}));
+
 test("cache persists script bytes and resolved log paths across instances without copying logs", () => fixture(async root => {
   const cache=new JobCache(root,()=>"host-a/login/slurm",()=>1024*1024);
   const text='#!/bin/bash\n# 中文\necho "$SLURM_JOB_ID"\n';

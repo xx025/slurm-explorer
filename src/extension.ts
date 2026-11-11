@@ -236,7 +236,8 @@ export function activate(context: vscode.ExtensionContext): void {
   const cache = new JobCache(path.join(context.globalStorageUri.fsPath, "job-cache"),
     () => JSON.stringify([os.hostname(), os.userInfo().username, settings().binDirectory]),
     () => config().get<number>("cacheMaxMB", 64) * 1024 * 1024,
-    error => output.appendLine(`Cache: ${message(error)}`));
+    error => output.appendLine(`Cache: ${message(error)}`),
+    cacheEnabled() ? path.join(path.dirname(context.globalStorageUri.fsPath), "xx025.slurm-job-viewer", "job-cache") : undefined);
   const jobScripts = new JobScripts(client, { cache, enabled: cacheEnabled, generation: () => cacheGeneration,
     onCached: (id, savedAt) => { void vscode.window.showInformationMessage(t("Showing cached script for job {0}, saved {1}. Slurm could not retrieve the script.", id, new Date(savedAt).toLocaleString(locale()))); }
   });

@@ -1,5 +1,5 @@
 import { createHash, randomBytes } from "node:crypto";
-import { mkdir, readFile, writeFile, rename, readdir, stat, unlink, chmod } from "node:fs/promises";
+import { mkdir, readFile, writeFile, rename, readdir, stat, unlink, chmod, cp, mkdtemp, rm } from "node:fs/promises";
 import path from "node:path";
 import { JobDetails, validateJobId } from "./model";
 import { logPath } from "./logs";
@@ -19,7 +19,27 @@ const kinds: CacheKind[] = ["stdout", "stderr", "script"];
 export class JobCache {
   private pending: Promise<unknown> = Promise.resolve();
   constructor(private readonly root: string, private readonly scope: () => string,
-    private readonly limit: () => number, private readonly report: (error: unknown) => void = () => {}) {}
+    private readonly limit: () => number, private readonly report: (error: unknown) => void = () => {},
+    legacyRoot?: string) {
+    if (legacyRoot && legacyRoot !== root) {
+      this.pending = this.migrate(legacyRoot).catch(error => { this.warn(error); });
+    }
+  }
+
+  /** Copy once on the first launch under the new extension ID; retain the old cache. */
+  private async migrate(legacyRoot: string): Promise<void> {
+    try { await stat(this.root); return; }
+    catch (error) { if ((error as NodeJS.ErrnoException).code !== "ENOENT") { throw error; } }
+    try { if (!(await stat(legacyRoot)).isDirectory()) { return; } }
+    catch (error) { if ((error as NodeJS.ErrnoException).code === "ENOENT") { return; } throw error; }
+    await mkdir(path.dirname(this.root), { recursive: true, mode: 0o700 });
+    const temporary = await mkdtemp(`${this.root}-migration-`);
+    try {
+      await cp(legacyRoot, temporary, { recursive: true });
+      await chmod(temporary, 0o700);
+      await rename(temporary, this.root);
+    } finally { await rm(temporary, { recursive: true, force: true }); }
+  }
 
   private warn(error: unknown): void { try { this.report(error); } catch { /* Diagnostics must not fail a live read. */ } }
   namespace(): string { return hash(this.scope()); }
