@@ -1,6 +1,8 @@
 # Changelog
 
-## 0.6.6
+## 0.6.7
+
+- Use the Marketplace display name Slurm Explorer: Jobs, Nodes & Partitions; retain Slurm Explorer in the sidebar.
 
 - Change the extension ID to xx025.slurm-explorer to match the project name. Existing users must install the new ID; Marketplace updates do not migrate between IDs.
 - Preserve slurmJobs settings and copy saved log paths and batch scripts from the old extension storage on first activation when the new cache does not exist. Keep the old cache and never copy log contents.

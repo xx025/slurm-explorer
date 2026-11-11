@@ -17,7 +17,7 @@ Requires VS Code 1.90 or newer. The remote host must be able to run `squeue`, `s
 
 ### Migrate from the old extension ID
 
-Starting with 0.6.6, the extension ID is `xx025.slurm-explorer`. If you installed `xx025.slurm-job-viewer`, disable the old extension, install the new ID on the same host, and open Slurm Explorer once before uninstalling the old extension. Marketplace updates do not move installations between IDs. Existing `slurmJobs.*` settings remain compatible. On first activation with caching enabled, saved log paths and batch scripts are copied from the old extension storage on the same host if the new cache does not already exist. The old cache is retained; log contents are never copied.
+Starting with 0.6.7, the extension ID is `xx025.slurm-explorer`. If you installed `xx025.slurm-job-viewer`, disable the old extension, install the new ID on the same host, and open Slurm Explorer once before uninstalling the old extension. Marketplace updates do not move installations between IDs. Existing `slurmJobs.*` settings remain compatible. On first activation with caching enabled, saved log paths and batch scripts are copied from the old extension storage on the same host if the new cache does not already exist. The old cache is retained; log contents are never copied.
 
 ### Update an existing installation
 

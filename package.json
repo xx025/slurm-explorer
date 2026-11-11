@@ -1,8 +1,8 @@
 {
   "name": "slurm-explorer",
-  "displayName": "Slurm Explorer",
+  "displayName": "Slurm Explorer: Jobs, Nodes & Partitions",
   "description": "%extension.description%",
-  "version": "0.6.6",
+  "version": "0.6.7",
   "publisher": "xx025",
   "license": "MIT",
   "engines": {
