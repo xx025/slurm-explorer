@@ -2,7 +2,7 @@
   "name": "slurm-job-viewer",
   "displayName": "Slurm Explorer",
   "description": "%extension.description%",
-  "version": "0.6.3",
+  "version": "0.6.4",
   "publisher": "xx025",
   "license": "MIT",
   "engines": {
@@ -104,6 +104,10 @@
         "command": "slurm.script",
         "title": "%command.script%",
         "icon": "$(file-code)"
+      },
+      {
+        "command": "slurm.clearCache",
+        "title": "%command.clearCache%"
       }
     ],
     "viewsContainers": {
@@ -251,6 +255,18 @@
             "%language.zh%",
             "%language.en%"
           ]
+        },
+        "slurmJobs.cacheEnabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "%config.cacheEnabled%"
+        },
+        "slurmJobs.cacheMaxMB": {
+          "type": "integer",
+          "default": 64,
+          "minimum": 1,
+          "maximum": 4096,
+          "description": "%config.cacheMaxMB%"
         }
       }
     }

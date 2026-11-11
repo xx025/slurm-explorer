@@ -1,5 +1,6 @@
 import * as vscode from "vscode";
 import os from "node:os";
+import path from "node:path";
 import { randomBytes } from "node:crypto";
 import { Job, JobDetails, escapeHtml, groupFor, validateJobId } from "./model";
 import { Settings, SlurmClient } from "./slurm";
@@ -7,6 +8,7 @@ import { createTranslator, errorMessage, resolveLanguage } from "./i18n";
 import { HistoryStore } from "./history";
 import { JobOutput } from "./output";
 import { JobScripts } from "./scripts";
+import { JobCache } from "./cache";
 import { ClusterViews } from "./cluster";
 
 type Group = { kind: "group"; label: string; jobs: Job[] };
@@ -230,7 +232,14 @@ export function activate(context: vscode.ExtensionContext): void {
   const view = vscode.window.createTreeView("slurmJobs", { treeDataProvider: tree, showCollapseAll: true });
   const cluster = new ClusterViews(client, t, language, message);
   const jobOutput = new JobOutput();
-  const jobScripts = new JobScripts(client);
+  const cacheEnabled = () => config().get<boolean>("cacheEnabled", true);
+  const cache = new JobCache(path.join(context.globalStorageUri.fsPath, "job-cache"),
+    () => JSON.stringify([os.hostname(), os.userInfo().username, settings().binDirectory]),
+    () => config().get<number>("cacheMaxMB", 64) * 1024 * 1024,
+    error => output.appendLine(`Cache: ${message(error)}`));
+  const jobScripts = new JobScripts(client, { cache, enabled: cacheEnabled, generation: () => cacheGeneration,
+    onCached: (id, savedAt) => { void vscode.window.showInformationMessage(t("Showing cached script for job {0}, saved {1}. Slurm could not retrieve the script.", id, new Date(savedAt).toLocaleString(locale()))); }
+  });
   const panels = new Map<string, vscode.WebviewPanel>();
   const panelDetails = new Map<string, JobDetails>();
   let pendingRefresh: Promise<void> | undefined;
@@ -239,6 +248,31 @@ export function activate(context: vscode.ExtensionContext): void {
   let disposed = false;
   let logRequest = 0;
   let scriptRequest = 0;
+  let backgroundCache = false;
+  let cacheGeneration = 0;
+  const cacheAttempts = new Map<string, number>();
+
+  function cacheJobs(jobs: Job[]): void {
+    if (!cacheEnabled() || backgroundCache || disposed) { return; }
+    const namespace = cache.namespace(), generation = cacheGeneration;
+    const own = os.userInfo().username;
+    const candidates = jobs.filter(job => job.user === own &&
+      Date.now() - (cacheAttempts.get(`${namespace}:${job.id}`) ?? 0) > 300000).slice(0, 3);
+    if (!candidates.length) { return; }
+    backgroundCache = true;
+    void (async () => {
+      for (const job of candidates) {
+        if (disposed || !cacheEnabled() || namespace !== cache.namespace() || generation !== cacheGeneration) { break; }
+        cacheAttempts.set(`${namespace}:${job.id}`, Date.now());
+        try {
+          const details = await client.details(job.id);
+          if (disposed || namespace !== cache.namespace() || generation !== cacheGeneration || !cacheEnabled()) { break; }
+          await cache.remember(details, namespace);
+          if (generation === cacheGeneration) { await jobScripts.prefetch(job.id); }
+        } catch (error) { output.appendLine(`Cache ${job.id}: ${message(error)}`); }
+      }
+    })().finally(() => { backgroundCache = false; });
+  }
   context.subscriptions.push(output, tree, view, jobOutput, jobScripts, cluster,
   );
 
@@ -258,6 +292,7 @@ export function activate(context: vscode.ExtensionContext): void {
           if (disposed) { return; }
           if (requestedUser !== settings().user) { refreshAgain = true; continue; }
           tree.update(jobs);
+          cacheJobs(jobs);
           await vscode.commands.executeCommand("setContext", "slurm.hasJobs", jobs.length > 0);
           view.message = t("{0} · {1} jobs · {2}", userLabel(requestedUser), jobs.length, new Date().toLocaleTimeString(locale()))
             + (tree.filter ? t(" · filter: {0}", tree.filter) : "");
@@ -287,9 +322,27 @@ export function activate(context: vscode.ExtensionContext): void {
 
   async function openLog(id: string, stream: "StdOut" | "StdErr", known?: JobDetails): Promise<void> {
     const request = ++logRequest;
-    const details = await client.logDetails(id, known);
-    if (disposed) { return; }
-    await jobOutput.open(details, stream, () => request === logRequest);
+    const namespace = cache.namespace();
+    const previous = cacheEnabled() ? await cache.get(id, namespace) : undefined;
+    let sameSubmission = true;
+    try {
+      const details = await client.logDetails(id, known);
+      if (disposed) { return; }
+      sameSubmission = !previous?.submission || !details.fields.SubmitTime || previous.submission === details.fields.SubmitTime;
+      if (cacheEnabled()) {
+        await cache.remember(details, namespace);
+        void jobScripts.prefetch(id).catch(error => output.appendLine(`Cache ${id}: ${message(error)}`));
+      }
+      await jobOutput.open(details, stream, () => request === logRequest);
+    } catch (error) {
+      const saved = previous?.items[stream === "StdOut" ? "stdout" : "stderr"];
+      if (!saved || !sameSubmission || !cacheEnabled() || disposed) { throw error; }
+      // Only a path is cached. The real file must still exist and be readable.
+      await jobOutput.openFile(saved.source, () => request === logRequest);
+      if (request === logRequest) {
+        void vscode.window.showInformationMessage(t("Opened log using the cached path saved {0}. Log contents are read from the original file.", new Date(saved.savedAt).toLocaleString(locale())));
+      }
+    }
   }
 
   async function openScript(id: string): Promise<void> {
@@ -301,6 +354,11 @@ export function activate(context: vscode.ExtensionContext): void {
     const existing = panels.get(id);
     if (existing) { existing.reveal(); return; }
     const details = known ?? await client.details(id);
+    if (disposed) { return; }
+    if (cacheEnabled()) {
+      await cache.remember(details);
+      void jobScripts.prefetch(id).catch(error => output.appendLine(`Cache ${id}: ${message(error)}`));
+    }
     if (disposed) { return; }
     // Concurrent clicks may have opened the same job while querying.
     const opened = panels.get(id);
@@ -344,6 +402,11 @@ export function activate(context: vscode.ExtensionContext): void {
     await Promise.all([refresh(), tree.refreshHistory(true), cluster.refreshVisible()]);
   });
   register("slurm.output", () => output.show());
+  register("slurm.clearCache", async () => {
+    cacheGeneration++; cacheAttempts.clear();
+    await cache.clear();
+    void vscode.window.showInformationMessage(t("Cached log paths and batch scripts have been cleared for this Slurm connection."));
+  });
   register("slurm.selectUser", async () => {
     const ownUser = os.userInfo().username;
     const configured = config().get<string>("user", "").trim();
@@ -440,7 +503,7 @@ export function activate(context: vscode.ExtensionContext): void {
             if (details) { panel.webview.html = renderDetails(details); }
           }
         }
-        if (event.affectsConfiguration("slurmJobs.binDirectory")) { cluster.reset(); }
+        if (event.affectsConfiguration("slurmJobs.binDirectory")) { cacheGeneration++; cacheAttempts.clear(); cluster.reset(); }
         configureTimer();
         void refresh(true);
       }

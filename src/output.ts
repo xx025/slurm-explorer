@@ -10,7 +10,11 @@ export class JobOutput implements vscode.Disposable {
 
   async open(details: JobDetails, stream: "StdOut" | "StdErr", focus: () => boolean = () => true): Promise<void> {
     if (this.disposed) { return; }
-    const filename = logPath(details, stream);
+    await this.openFile(logPath(details, stream), focus);
+  }
+
+  async openFile(filename: string, focus: () => boolean = () => true): Promise<void> {
+    if (this.disposed) { return; }
     // Reject pipes and devices before asking the editor to read their contents.
     if (!(await stat(filename)).isFile()) { throw new UserError("Log preview supports regular files only."); }
     if (this.disposed) { return; }

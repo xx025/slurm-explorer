@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.6.4
+
+- Persist resolved stdout / stderr paths and complete Slurm batch scripts across extension restarts; never copy log contents into the cache.
+- Fall back to saved log paths and script snapshots when Slurm metadata or script retrieval fails, with saved-time notifications.
+- Capture paths and scripts when opening details or logs, and make bounded background captures for observed jobs owned by the login user. Keep history listing behavior unchanged.
+- Add a configurable 64 MiB cache limit, oldest-entry cleanup, connection isolation and a command to clear saved paths and scripts.
+- Make English the default README and retain Simplified Chinese documentation.
+
 ## 0.6.3
 
 - Add View Batch Script to job details, job context menus and the command palette. Open the controller-stored submission script as a read-only editor document; reuse tabs and refresh on reopen.

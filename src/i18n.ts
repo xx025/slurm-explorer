@@ -2,6 +2,9 @@ export type Language = "en" | "zh-cn";
 export type Translator = (text: string, ...values: (string | number)[]) => string;
 
 const chinese: Record<string, string> = {
+  "Showing cached script for job {0}, saved {1}. Slurm could not retrieve the script.": "正在显示作业 {0} 的缓存脚本，保存于 {1}。当前无法从 Slurm 获取脚本。",
+  "Opened log using the cached path saved {0}. Log contents are read from the original file.": "已使用 {0} 保存的缓存路径打开日志。日志内容仍从原文件读取。",
+  "Cached log paths and batch scripts have been cleared for this Slurm connection.": "已清除当前 Slurm 连接的日志路径和提交脚本缓存。",
   "{0}\nController: {1}\nAccounting: {2}": "{0}\n控制器：{1}\n记账：{2}",
   "View batch script": "查看提交脚本",
   "Job {0} has no retrievable batch script. It may be an interactive job, purged, inaccessible, or accounting may not store scripts (AccountingStoreFlags=job_script).": "无法获取作业 {0} 的提交脚本。可能是交互任务、记录已清理、无权访问，或记账未保存脚本（AccountingStoreFlags=job_script）。",

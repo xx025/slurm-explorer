@@ -8,10 +8,10 @@ const { createRequire } = require("node:module");
 const disposable = () => ({ dispose() {} });
 const settle = () => new Promise(resolve => setImmediate(resolve));
 
-function harness(initialGate) {
+function harness(initialGate, cacheRoot, values = {}) {
   const state = {
-    values: { refreshSeconds: 0 }, configurationListeners: [], commands: new Map(),
-    selections: [], inputs: [], queries: [], panels: [], errors: [],
+    values: { refreshSeconds: 0, cacheEnabled: false, ...values }, configurationListeners: [], commands: new Map(),
+    selections: [], inputs: [], queries: [], panels: [], errors: [], messages: [],
     historyQueries: [], quickPickCalls: 0, executed: [], revealed: [], terminals: [], documents: new Map(), editors: [],
     views: new Map(), resourceQueries: [], providers: new Map(), closeListeners: [], scriptQueries: []
   };
@@ -115,7 +115,7 @@ function harness(initialGate) {
       },
       showInputBox: async () => state.inputs.shift(),
       showErrorMessage: async text => { state.errors.push(text); },
-      showInformationMessage: async () => {},
+      showInformationMessage: async text => { state.messages.push(text); },
       withProgress: async (_options, task) => task(),
       createWebviewPanel: () => {
         const listeners = [];
@@ -185,12 +185,16 @@ function harness(initialGate) {
     : name === "./output" ? outputModule.exports : name === "./scripts" ? scriptsModule.exports : name === "./cluster" ? clusterModule.exports : realRequire(name);
   const module = { exports: {} };
   new Function("require", "module", "exports", fs.readFileSync(filename, "utf8"))(injectedRequire, module, module.exports);
-  const context = { subscriptions: [], extensionUri: api.Uri.file(path.join(__dirname, "..")) };
+  const storage = cacheRoot ?? fs.mkdtempSync(path.join(os.tmpdir(), "slurm-extension-cache-"));
+  const context = { subscriptions: [], globalStorageUri: api.Uri.file(storage), extensionUri: api.Uri.file(path.join(__dirname, "..")) };
   module.exports.activate(context);
   state.own = own;
   state.other = other;
   state.run = (name, ...args) => state.commands.get(name)(...args);
-  state.dispose = () => [...context.subscriptions].reverse().forEach(item => item.dispose());
+  state.dispose = () => {
+    [...context.subscriptions].reverse().forEach(item => item.dispose());
+    if (!cacheRoot) { fs.rmSync(storage, {recursive:true,force:true}); }
+  };
   return state;
 }
 
@@ -579,4 +583,111 @@ test("a script query finishing after disposal does not open an editor", async ()
     assert.equal(app.editors.length, 0);
     assert.equal(app.providers.has("slurm-script"), false);
   } finally { release(); }
+});
+
+test("paths and complete scripts survive extension restart without changing the history list", async () => {
+  const root=fs.mkdtempSync(path.join(os.tmpdir(),"slurm-persistent-cache-"));
+  const filename=path.join(root,'job.out');
+  const logText='secret training log content is never cached\n';
+  const script='#!/bin/bash\n# generated script\necho "$SLURM_JOB_ID"\n';
+  fs.writeFileSync(filename,logText);
+  let app=harness(undefined,root);
+  try {
+    await settle(); app.values.cacheEnabled=true; app.logFile=filename;
+    app.scriptHandler=async()=>script;
+    await app.run('slurm.stdout','42');
+    await app.run('slurm.script','42');
+    app.dispose();
+    fs.writeFileSync(filename,logText+"new output after restart\n");
+    app=harness(undefined,root);
+    await settle(); app.values.cacheEnabled=true;
+    app.logDetailsHandler=async()=>{throw new Error('job no longer retained');};
+    app.scriptHandler=async()=>{throw new Error('controller and accounting lost script');};
+    await app.run('slurm.stdout','42');
+    assert.equal(app.editors[0].document.uri.fsPath,filename);
+    assert.equal(app.editors[0].document.getText(),logText+"new output after restart\n");
+    assert.match(app.messages[0],/cached path/);
+    await app.run('slurm.script','42');
+    assert.equal(app.editors[1].document.getText(),script);
+    assert.match(app.messages[1],/cached script/);
+    assert.match(app.messages[1],/saved/);
+    await app.run('slurm.history');
+    assert.deepEqual(app.tree.getChildren(app.tree.historyRoot).map(node=>node.details.id),['101','100']);
+    assert.equal(app.commands.has('slurm.cachedJobs'),false);
+    const cacheDir=path.join(root,'job-cache');
+    const scope=fs.readdirSync(cacheDir)[0];
+    const files=fs.readdirSync(path.join(cacheDir,scope));
+    assert.equal(files.filter(file=>file.endsWith('.data')).length,1);
+    for(const file of files) {
+      assert.ok(!fs.readFileSync(path.join(cacheDir,scope,file),'utf8').includes(logText));
+    }
+    assert.deepEqual(app.errors,[]);
+    fs.unlinkSync(filename);
+    const count=app.editors.length;
+    await app.run('slurm.stdout','42');
+    assert.equal(app.editors.length,count);
+    assert.match(app.errors.at(-1),/ENOENT/);
+  } finally {app.dispose();fs.rmSync(root,{recursive:true,force:true});}
+});
+
+test("clearing cache during an in-flight script fetch cannot recreate the cleared snapshot", async () => {
+  const root=fs.mkdtempSync(path.join(os.tmpdir(),"slurm-clear-cache-"));
+  const app=harness(undefined,root);
+  let release;
+  const gate=new Promise(resolve=>{release=resolve;});
+  try {
+    await settle(); app.values.cacheEnabled=true;
+    app.scriptHandler=async()=>{await gate;return '#!/bin/bash\necho current\n';};
+    const pending=app.run('slurm.script','42'); await settle();
+    await app.run('slurm.clearCache'); release(); await pending;
+    assert.equal(app.editors.length,1);
+    app.scriptHandler=async()=>{throw new Error('no remote script');};
+    await app.run('slurm.script','42');
+    assert.equal(app.editors.length,1);
+    assert.equal(app.errors.at(-1),'no remote script');
+  } finally {release();app.dispose();fs.rmSync(root,{recursive:true,force:true});}
+});
+
+test("cache-disabled operation never falls back to a script saved earlier", async () => {
+  const root=fs.mkdtempSync(path.join(os.tmpdir(),"slurm-disabled-cache-"));
+  const app=harness(undefined,root);
+  try {
+    await settle(); app.values.cacheEnabled=true;
+    await app.run('slurm.script','42');
+    app.values.cacheEnabled=false;
+    app.scriptHandler=async()=>{throw new Error('offline');};
+    await app.run('slurm.script','42');
+    assert.equal(app.editors.length,1);
+    assert.equal(app.errors.at(-1),'offline');
+  } finally {app.dispose();fs.rmSync(root,{recursive:true,force:true});}
+});
+
+test("queue background capture saves only login-user jobs without loading history", async () => {
+  const root=fs.mkdtempSync(path.join(os.tmpdir(),"slurm-auto-cache-"));
+  const app=harness(undefined,root,{cacheEnabled:true,user:'*'});
+  try {
+    app.logFile=path.join(root,'not-created-yet.out');
+    const findRecord=()=>{
+      const cacheDir=path.join(root,'job-cache');
+      if(!fs.existsSync(cacheDir))return;
+      for(const scope of fs.readdirSync(cacheDir)) {
+        for(const name of fs.readdirSync(path.join(cacheDir,scope)).filter(name=>name.endsWith('.json'))) {
+          const record=JSON.parse(fs.readFileSync(path.join(cacheDir,scope,name),'utf8'));
+          if(record.items.script)return record;
+        }
+      }
+    };
+    let record;
+    for(let attempt=0;attempt<100&&!record;attempt++) {
+      await new Promise(resolve=>setTimeout(resolve,5));record=findRecord();
+    }
+    assert.ok(record,'expected background snapshot');
+    assert.equal(record.id,'42');
+    assert.equal(record.items.stdout.source,app.logFile);
+    assert.equal(record.items.stdout.file,undefined);
+    assert.deepEqual(app.scriptQueries,['42']);
+    assert.deepEqual(app.historyQueries,[]);
+    assert.equal(app.editors.length,0);
+    assert.deepEqual(app.errors,[]);
+  } finally {app.dispose();fs.rmSync(root,{recursive:true,force:true});}
 });

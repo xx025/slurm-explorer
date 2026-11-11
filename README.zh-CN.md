@@ -82,7 +82,7 @@ GPU 数量优先读取 `CfgTRES` / `AllocTRES`，并兼容 `Gres` / `GresUsed`�
 
 打开历史任务的输出时，扩展会按需查询 Slurm 记账中保存的 `StdOut` / `StdErr`、`WorkDir` 和 `JobIDRaw` 等字段，解析日志路径，并支持数组任务文件名。
 
-**路径缺失时仅提示，跳过文件打开，不弹出文件选择框。** 路径存在时，文件仍须保留在远端主机可访问的位置，并允许当前 SSH 用户读取。旧版本 Slurm 未提供日志路径字段时，历史列表和详情仍可正常使用。
+**路径缺失时优先回退到已保存的路径；没有缓存时提示并跳过，不弹出文件选择框。** 路径存在时，文件仍须保留在远端主机可访问的位置，并允许当前 SSH 用户读取。旧版本 Slurm 未提供日志路径字段时，历史列表和详情仍可正常使用。
 
 控制器明确返回空的 stderr 路径时，使用合并后的 stdout。支持 `%j`、`%A`、`%a`、`%x`、`%u` 和数字补零；需要节点或任务上下文的模板（如 `%N`、`%t`）可能无法解析。
 
@@ -95,6 +95,20 @@ GPU 数量优先读取 `CfgTRES` / `AllocTRES`，并兼容 `Gres` / `GresUsed`�
 这份内容是提交时交给 Slurm 的脚本快照。如果提交工具事先渲染了模板，可以在此查看渲染后的内容；Shell 变量、命令替换和运行时生成的命令不会自动展开。
 
 控制器不再保留脚本时，会尝试 `sacct --batch-script --jobs=<job_id> --noheader`。历史脚本要求集群配置 `AccountingStoreFlags=job_script`，且记录仍保留在 `slurmJobs.historyDays` 查询范围内。交互任务、无权访问、脚本未保存或记录已清理时，显示原因；脚本访问仍受 Slurm 权限限制。
+
+## 日志路径与脚本缓存
+
+默认启用持久缓存，重载或重启 VS Code 后仍可使用。**日志只缓存路径，不缓存日志内容；Slurm 提交脚本保存全文。**
+
+- 打开作业详情或日志时保存可解析的 stdout / stderr 绝对路径，并在后台尝试保存提交脚本；直接查看脚本成功时也会保存。
+- 每次队列刷新会后台处理最多 3 个当前登录用户拥有的作业，不为其他用户批量抓取。已尝试的作业间隔至少 5 分钟再处理；关闭视图自动刷新后，不会额外轮询队列。
+- 打开日志时，优先查询当前路径；路径查询失败时使用已保存路径，仍在文件编辑器中打开原日志。原文件必须存在且可读，已删除的日志无法从路径缓存恢复。
+- 查看脚本时，优先从 Slurm 获取；控制器和记账均无法取回时，显示已保存的完整只读脚本，并提示保存时间。
+- **历史列表、查询天数、排序和筛选保持原样**，不会创建额外的缓存作业列表。没有提前保存的路径或脚本，无法在记录清理后补回。
+
+缓存保存在扩展的持久存储目录；Remote-SSH 下位于远端主机。按主机、登录用户和 Slurm 命令目录隔离，目录权限为 `0700`，文件权限为 `0600`。默认上限 **64 MiB**，超出后删除最旧的作业缓存。
+
+使用 `slurmJobs.cacheEnabled` 开关缓存，`slurmJobs.cacheMaxMB` 调整容量。在命令面板执行 **Slurm: 清除路径和脚本缓存**，清除当前连接的缓存；不会删除原日志文件或修改 Slurm 作业。
 
 ## 中英文与设置
 
@@ -111,7 +125,9 @@ GPU 数量优先读取 `CfgTRES` / `AllocTRES`，并兼容 `Gres` / `GresUsed`�
   "slurmJobs.binDirectory": "",
   "slurmJobs.refreshSeconds": 30,
   "slurmJobs.timeoutSeconds": 20,
-  "slurmJobs.historyDays": 7
+  "slurmJobs.historyDays": 7,
+  "slurmJobs.cacheEnabled": true,
+  "slurmJobs.cacheMaxMB": 64
 }
 ```
 
@@ -123,6 +139,8 @@ GPU 数量优先读取 `CfgTRES` / `AllocTRES`，并兼容 `Gres` / `GresUsed`�
 | `slurmJobs.refreshSeconds` | `30` | 可见任务、分区、节点视图刷新间隔，0–3600 秒；`0` 关闭视图和历史自动刷新，不影响编辑器文件更新 |
 | `slurmJobs.timeoutSeconds` | `20` | 单条 Slurm 查询超时，2–120 秒 |
 | `slurmJobs.historyDays` | `7` | 历史及记账查找窗口，1–365 天 |
+| `slurmJobs.cacheEnabled` | `true` | 持久保存日志路径和完整提交脚本，不复制日志内容 |
+| `slurmJobs.cacheMaxMB` | `64` | 每个连接的缓存容量上限（MiB），超出后删除最旧条目 |
 
 ## 命令速查
 
@@ -143,6 +161,7 @@ GPU 数量优先读取 `CfgTRES` / `AllocTRES`，并兼容 `Gres` / `GresUsed`�
 | Open Standard Output File | 在文件编辑器中打开 stdout |
 | Open Standard Error File | 在文件编辑器中打开 stderr |
 | View Batch Script | 查看 Slurm 保存的提交脚本 |
+| Clear Cached Paths and Scripts | 清除当前连接的路径和脚本缓存 |
 | Copy Job ID | 复制任务 ID |
 | Show Query Output | 查看查询命令和诊断 |
 

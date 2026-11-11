@@ -82,7 +82,7 @@ Missing or unreadable files show an error. Open again once the file is available
 
 Opening historical output queries accounting on demand for retained fields such as `StdOut` / `StdErr`, `WorkDir` and `JobIDRaw`, resolves the path and supports array-job filename patterns.
 
-**Missing paths are reported and opening is skipped without a file picker.** When a path exists, the file must still be present on a filesystem accessible from the remote host and readable by the SSH user. Older Slurm versions without log path fields can still display normal history and details.
+**Missing paths fall back to saved paths when available; otherwise an error is reported without a file picker.** When a path exists, the file must still be present on a filesystem accessible from the remote host and readable by the SSH user. Older Slurm versions without log path fields can still display normal history and details.
 
 An explicitly empty controller stderr path uses the merged stdout file. Supported patterns include `%j`, `%A`, `%a`, `%x`, `%u` and numeric padding. Patterns requiring node or task context, such as `%N` or `%t`, may remain unresolved.
 
@@ -95,6 +95,20 @@ The extension uses `scontrol write batch_script <job_id> -` to retrieve the cont
 This is the script submitted to Slurm. If a submission tool rendered a template first, its rendered content appears here. Shell variables, command substitutions and runtime-generated commands remain unexpanded.
 
 If the controller no longer retains the script, the extension tries `sacct --batch-script --jobs=<job_id> --noheader`. Historical scripts require `AccountingStoreFlags=job_script` and a retained record within `slurmJobs.historyDays`. Interactive jobs, denied access, missing scripts and purged records produce explicit errors. Slurm permissions still control script access.
+
+## Cached log paths and batch scripts
+
+Persistent caching is enabled by default and survives VS Code reloads and restarts. **Only log paths are cached; log contents are never copied. Submitted Slurm scripts are cached in full.**
+
+- Opening job details or logs saves resolved absolute stdout / stderr paths and attempts to capture the submitted script in the background. Successfully viewing a script also saves it.
+- Each queue refresh processes up to 3 observed jobs owned by the login user in the background. Other users' jobs are not bulk-captured. Attempts for the same job are at least 5 minutes apart; disabling view auto-refresh does not introduce separate queue polling.
+- Opening a log queries its current path first. If that lookup fails, the saved path opens the original file in the editor. The file must still exist and be readable; a path cache cannot recover a deleted log.
+- Viewing a script queries Slurm first. If both controller and accounting retrieval fail, the saved full script opens read-only and a notification shows when it was saved.
+- **History listing, lookback days, ordering and filtering are unchanged.** There is no extra cached-job list. Paths or scripts never captured before records were purged cannot be recovered later.
+
+The cache resides in the extension's persistent storage, on the remote host when using Remote-SSH. It is isolated by host, login and Slurm binary directory, with `0700` directories and `0600` files. The default limit is **64 MiB**; oldest job cache entries are removed when the limit is exceeded.
+
+Use `slurmJobs.cacheEnabled` to enable / disable caching and `slurmJobs.cacheMaxMB` to change the limit. Run **Slurm: Clear Cached Paths and Scripts** from the command palette to clear this connection's cache. Original log files and Slurm jobs remain intact.
 
 ## Languages and settings
 
@@ -111,7 +125,9 @@ Configure these in **Remote Settings**:
   "slurmJobs.binDirectory": "",
   "slurmJobs.refreshSeconds": 30,
   "slurmJobs.timeoutSeconds": 20,
-  "slurmJobs.historyDays": 7
+  "slurmJobs.historyDays": 7,
+  "slurmJobs.cacheEnabled": true,
+  "slurmJobs.cacheMaxMB": 64
 }
 ```
 
@@ -123,6 +139,8 @@ Configure these in **Remote Settings**:
 | `slurmJobs.refreshSeconds` | `30` | Visible job / partition / node view refresh interval, 0–3600 seconds; `0` disables view / history auto-refresh without affecting editor file updates |
 | `slurmJobs.timeoutSeconds` | `20` | Timeout per Slurm query, 2–120 seconds |
 | `slurmJobs.historyDays` | `7` | Accounting history and lookup window, 1–365 days |
+| `slurmJobs.cacheEnabled` | `true` | Persist log paths and full submitted scripts, never log contents |
+| `slurmJobs.cacheMaxMB` | `64` | Per-connection cache limit in MiB; evict oldest entries when exceeded |
 
 ## Command reference
 
@@ -143,6 +161,7 @@ Press `Ctrl+Shift+P` and search for `Slurm`. Names below are English; Chinese VS
 | Open Standard Output File | Open stdout in the file editor |
 | Open Standard Error File | Open stderr in the file editor |
 | View Batch Script | Open Slurm’s stored submission script in a read-only editor |
+| Clear Cached Paths and Scripts | Clear saved paths and scripts for this connection |
 | Copy Job ID | Copy a job ID |
 | Show Query Output | View query commands and diagnostics |
 

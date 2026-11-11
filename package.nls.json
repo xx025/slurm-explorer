@@ -27,5 +27,8 @@
   "command.refreshPartitions": "Slurm: Refresh Partitions",
   "command.refreshNodes": "Slurm: Refresh Nodes",
   "command.resourceDetails": "Slurm: Show Resource Details",
-  "command.script": "Slurm: View Batch Script"
+  "command.script": "Slurm: View Batch Script",
+  "command.clearCache": "Slurm: Clear Cached Paths and Scripts",
+  "config.cacheEnabled": "Persist log paths (never log contents) and full submitted batch scripts. Automatically capture observed jobs owned by the login user, and capture when opening details or logs. Use cached data when remote retrieval fails. History listing rules are unchanged.",
+  "config.cacheMaxMB": "Cache limit in MiB for this host, login and Slurm binary directory. Defaults to 64; oldest job cache entries are removed when the limit is exceeded."
 }

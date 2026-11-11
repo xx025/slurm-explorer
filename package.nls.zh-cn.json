@@ -27,5 +27,8 @@
   "command.refreshPartitions": "Slurm：刷新分区",
   "command.refreshNodes": "Slurm：刷新节点",
   "command.resourceDetails": "Slurm：查看资源详情",
-  "command.script": "Slurm: 查看提交脚本"
+  "command.script": "Slurm: 查看提交脚本",
+  "command.clearCache": "Slurm: 清除路径和脚本缓存",
+  "config.cacheEnabled": "持久保存日志路径（不保存日志内容）和完整提交脚本。自动保存当前用户在队列中出现的作业，打开详情或日志时也会保存。远端无法获取时使用缓存。历史列表规则不变。",
+  "config.cacheMaxMB": "当前主机、登录用户和 Slurm 命令目录对应的缓存容量上限（MiB）。默认 64，超出后删除最旧的作业缓存。"
 }
